@@ -1,0 +1,20 @@
+{
+  "name": "quiet-line-local",
+  "interface": {
+    "displayName": "Quiet Line Local"
+  },
+  "plugins": [
+    {
+      "name": "quiet-line",
+      "source": {
+        "source": "local",
+        "path": "./plugins/quiet-line"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Design"
+    }
+  ]
+}

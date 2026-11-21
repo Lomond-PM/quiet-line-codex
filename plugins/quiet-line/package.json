@@ -1,0 +1,17 @@
+{
+  "name": "quiet-line-codex",
+  "private": true,
+  "version": "1.4.1",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "npm --prefix engine test && node --test test-mcp.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "ajv": "^8.17.1",
+    "sharp": "0.35.5"
+  }
+}

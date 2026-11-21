@@ -1,0 +1,12 @@
+{
+  "name": "quiet-line-engine",
+  "version": "1.4.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "test": "node tests/controls.cjs && node tests/oil-regression.cjs && node tests/oil-shape-regression.cjs && node tests/state.cjs && node tests/integration.mjs && node tests/dry.cjs && node tests/dry-integration.mjs && node tests/project-store.cjs && node tests/project-integration.mjs && node tests/project-dry-integration.mjs && node tests/project-docs.mjs && node tests/art-guidance.mjs"
+  }
+}
