@@ -1,5 +1,11 @@
 # Quiet Line for Codex
 
+| 石巷留光 | 岬角夜潮 | 石榴与旧铜壶 |
+| :---: | :---: | :---: |
+| <a href="docs/stone-passage.png"><img src="docs/stone-passage.png" width="180" alt="石巷留光 · The Stone Passage"></a> | <a href="docs/night-tide.png"><img src="docs/night-tide.png" width="324" alt="岬角夜潮 · Night Tide"></a> | <a href="docs/ruby-and-copper.png"><img src="docs/ruby-and-copper.png" width="193" alt="石榴与旧铜壶 · Ruby and Copper"></a> |
+
+*以上三幅作品均由 Codex 中的 **6.2 Astra Max** 使用 Quiet Line 绘制。*
+
 Quiet Line 给 Codex 一张画布和一套画笔。Codex 规划构图和笔触，Quiet Line 在本机渲染 PNG，并把预览返回到对话。支持墨线、石墨、炭笔、湿油彩，以及可继续编辑的 `.qlproject` 工程。
 
 绘画引擎来自 [Quiet Line 1.4.1](https://github.com/Lomond-PM/quiet-line-board/tree/42f4e9073ed151e2273f67e1f5f32337284aced5)，此仓库提供 Codex 的本地 MCP 接入和绘画技能。
