@@ -95,6 +95,48 @@ try {
     assert.deepEqual(m.steps.map(s => s.id), [3]); assert.equal(m.mode, 'wet');
     noSidecars();
   });
+  test('V1 and V2 upgrade to V3 without changing old state; mixed history branches and restores', () => {
+    const mixed = Buffer.from('opaque mixed material state');
+    const fresh = commit('fresh-v3.qlproject', { mode: 'mixed', state: mixed });
+    assert.equal(version('fresh-v3.qlproject'), 3);
+    assert.deepEqual(readProject(cwd, fresh.path, { includeData: true }).selected.state, mixed);
+
+    for (const oldVersion of [1, 2]) {
+      const file = `upgrade-v${oldVersion}.qlproject`, legacyMode = oldVersion === 1 ? 'dry' : 'wet';
+      if (oldVersion === 1) legacy(file, legacyMode, state, { label: 'first' });
+      else commit(file, { mode: legacyMode, label: 'first' });
+      assert.equal(version(file), oldVersion);
+      const original = fs.readFileSync(path.join(cwd, file));
+      assert.throws(() => commit(file, { expectedRevision: 1, mode: 'mixed' }), /allowModeSwitch/);
+      assert.throws(() => commit(file, { expectedRevision: 9, mode: 'mixed', allowModeSwitch: true }), { code: 'ERR_PROJECT_REVISION' });
+      assert.deepEqual(fs.readFileSync(path.join(cwd, file)), original);
+
+      let m = commit(file, { expectedRevision: 1, mode: 'mixed', state: mixed, allowModeSwitch: true });
+      assert.equal(version(file), 3);
+      assert.deepEqual(m.steps.map(s => [s.mode, s.pinned]), [[legacyMode, true], ['mixed', false]]);
+      const old = readProject(cwd, file, { step: 1, includeData: true }).selected;
+      assert.deepEqual(old.state, state);
+      assert.deepEqual(old.png, png);
+      assert.deepEqual(old.info, info);
+
+      const sourceBeforeBranch = fs.readFileSync(m.path);
+      const target = `mixed-branch-v${oldVersion}.qlproject`;
+      const branch = manageProject(cwd, file, { action: 'branch', step: 2, target, expectedRevision: m.revision });
+      assert.equal(version(target), 3);
+      assert.equal(branch.mode, 'mixed');
+      assert.deepEqual(readProject(cwd, target, { includeData: true }).selected.state, mixed);
+      assert.deepEqual(fs.readFileSync(m.path), sourceBeforeBranch);
+      assert.deepEqual(manageProject(cwd, file, { action: 'recover' }), m);
+
+      m = mutate(file, { action: 'restore', step: 1 });
+      assert.equal(m.mode, legacyMode);
+      assert.equal(version(file), 3);
+      m = mutate(file, { action: 'restore', step: 2 });
+      assert.equal(m.mode, 'mixed');
+      assert.deepEqual(readProject(cwd, file, { includeData: true }).selected.state, mixed);
+    }
+    noSidecars();
+  });
   test('1.3 legacy reads/verify leave bytes unchanged; same-mode writes stay V1', () => {
     for (const mode of ['wet', 'dry']) {
       const file = `legacy-${mode}.qlproject`; legacy(file, mode);
@@ -130,8 +172,11 @@ try {
     const file = 'legacy-rollback.qlproject', large = Buffer.alloc(33 * MiB, 11);
     legacy(file, 'dry', large, { label: 'protected', maxBytes: 64 * MiB });
     const before = fs.readFileSync(path.join(cwd, file));
-    assert.throws(() => commit(file, { expectedRevision: 1, mode: 'wet', state: large, allowModeSwitch: true }), { code: 'ERR_PROJECT_CAPACITY' });
-    assert.equal(version(file), 1); assert.deepEqual(fs.readFileSync(path.join(cwd, file)), before);
+    for (const mode of ['wet', 'mixed']) {
+      assert.throws(() => commit(file, { expectedRevision: 1, mode, state: large, allowModeSwitch: true }), { code: 'ERR_PROJECT_CAPACITY' });
+      assert.equal(version(file), 1);
+      assert.deepEqual(fs.readFileSync(path.join(cwd, file)), before);
+    }
     assert.equal(readProject(cwd, file).mode, 'dry');
     noSidecars();
   });
@@ -236,8 +281,13 @@ try {
     assert(fs.statSync(m.path).size <= 80 * MiB);
   });
   test('input bounds and plain JSON reject before creating SQL file', () => {
+    // Oversized bytes are rejected before SQLite sees the payload. Allocation
+    // is uninitialized because this test only examines length.
+    const oversized = Buffer.allocUnsafe(576 * MiB + 1);
     for (const opts of [
-      { state: Buffer.alloc(0) }, { state: new Uint8Array(2) }, { state: Buffer.alloc(224 * MiB + 1) },
+      { state: Buffer.alloc(0) }, { state: new Uint8Array(2) },
+      { state: oversized.subarray(0, 320 * MiB + 16 * 1024 + 13) },
+      { mode: 'mixed', state: oversized },
       { png: Buffer.alloc(8) }, { png: Buffer.alloc(32 * MiB + 1) }, { mode: 'other' },
       { info: [] }, { info: new Date() }, { info: { x: undefined } }, { info: { x: Infinity } },
       { info: { x: 'x'.repeat(16385) } }, { info: { get x() { throw new Error('must not execute'); } } },
@@ -258,10 +308,11 @@ try {
       ['bad-json.qlproject', "UPDATE steps SET info='invalid'"],
       ['bad-meta.qlproject', "UPDATE project SET mode=zeroblob(1000000)"],
       ['bad-step-mode.qlproject', "UPDATE steps SET mode='bad'"],
+      ['unversioned-mixed-mode.qlproject', "UPDATE project SET mode='mixed'; UPDATE steps SET mode='mixed';"],
       ['bad-step-mode-type.qlproject', "UPDATE steps SET mode=zeroblob(1000000)"],
       ['bad-head-mode.qlproject', "UPDATE project SET mode='dry'"],
       ['bad-v1-schema.qlproject', 'PRAGMA user_version=1'],
-      ['bad-length.qlproject', "UPDATE steps SET state=zeroblob(234881025)"],
+      ['bad-length.qlproject', "UPDATE steps SET state=zeroblob(0)"],
       ['bad-png-length.qlproject', "UPDATE steps SET png=zeroblob(33554433)"],
       ['bad-info-length.qlproject', "UPDATE steps SET info=printf('%20000s','x')"],
       ['bad-type.qlproject', "UPDATE steps SET parentId=zeroblob(1000000)"],

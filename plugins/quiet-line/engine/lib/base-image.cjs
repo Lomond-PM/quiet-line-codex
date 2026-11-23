@@ -2,15 +2,15 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const sharp = require('sharp');
+const { MAX_CANVAS_SIDE } = require('./core.cjs');
 
 const MAX_BYTES = 32 * 1024 * 1024;
 const MAX_PIXELS = 32 * 1000 * 1000;
-const MAX_SIDE = 1800;
 
 function dimension(value, label) {
   const n = Number(value);
-  if (!Number.isInteger(n) || n < 1 || n > MAX_SIDE) {
-    throw new Error(`${label} must be an integer between 1 and ${MAX_SIDE} when base_image is used`);
+  if (!Number.isInteger(n) || n < 1 || n > MAX_CANVAS_SIDE) {
+    throw new Error(`${label} must be an integer between 1 and ${MAX_CANVAS_SIDE} when base_image is used`);
   }
   return n;
 }
@@ -51,7 +51,7 @@ async function loadBaseImage(cwd, requested, args = {}) {
   } else if (args.height != null) {
     height = dimension(args.height, 'height'); width = Math.max(1, Math.round(height * sourceWidth / sourceHeight));
   } else {
-    const scale = Math.min(1, MAX_SIDE / Math.max(sourceWidth, sourceHeight));
+    const scale = Math.min(1, MAX_CANVAS_SIDE / Math.max(sourceWidth, sourceHeight));
     width = Math.max(1, Math.round(sourceWidth * scale)); height = Math.max(1, Math.round(sourceHeight * scale));
   }
   dimension(width, 'width'); dimension(height, 'height');

@@ -6,9 +6,11 @@
 
 *以上三幅作品均由 Codex 中的 **6.2 Astra Max** 使用 Quiet Line 绘制。*
 
-Quiet Line 给 Codex 一张画布和一套画笔。Codex 规划构图和笔触，Quiet Line 在本机渲染 PNG，并把预览返回到对话。支持墨线、石墨、炭笔、湿油彩，以及可继续编辑的 `.qlproject` 工程。
+Quiet Line 是一个面向 Codex 的绘画插件，主要模拟真实画材的落笔表现。墨线和毛刷随笔势变化，石墨和炭粉可以擦揉，湿油彩支持拾色、混色、厚涂和干化。引擎在本机渲染 PNG，也能保存可继续作画的 `.qlproject` 工程。
 
-绘画引擎来自 [Quiet Line 1.4.1](https://github.com/Lomond-PM/quiet-line-board/tree/42f4e9073ed151e2273f67e1f5f32337284aced5)，此仓库提供 Codex 的本地 MCP 接入和绘画技能。
+Quiet Line is a local painting plugin for Codex focused on simulating traditional art materials: expressive ink, erasable graphite and charcoal, and wet oils with pigment pickup, blending, relief and drying.
+
+绘画引擎来自 [Quiet Line 1.5.0](https://github.com/Lomond-PM/quiet-line-board/tree/252155c1a55945ac1bc7aae84aea3a5ea81e3603)，此仓库提供 Codex 的本地 MCP 接入和绘画技能。
 
 ## 安装
 
@@ -26,7 +28,7 @@ codex plugin add quiet-line@quiet-line-local
 
 ## 工具
 
-- `quiet_line_draw` 从空白画布作画、在已有图片上添画，或继续可编辑工程。
+- `quiet_line_draw` 从空白画布作画、在已有图片上添画，或在同一个工程中切换笔刷并继续作画。画布每边最高 2560 像素。
 - `quiet_line_project` 查看历史、管理检查点、恢复步骤、另存分支、导出或干化油彩。
 
 两个工具的 `workspace` 参数是本机工作目录的绝对路径。新输出使用工作目录下的相对文件名。显式指定的 PNG 文件名必须是新文件名。默认文件名发生碰撞时自动追加序号。

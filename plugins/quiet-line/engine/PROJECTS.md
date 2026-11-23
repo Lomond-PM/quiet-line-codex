@@ -10,9 +10,24 @@
 
 `.qlpaint` and `.qldry` remain standalone material snapshots. A **`.qlproject`** instead holds material snapshots, PNG previews, step metadata and named checkpoints in one SQLite project. Pass the same `project` path to successive `quiet_line_draw` calls; successful calls automatically record new steps. PNG output remains independent. Existing PNGs and snapshots are never automatically deleted.
 
-1.4.0 起，同一工程可以**分阶段交替使用干湿材料**：`wet`（oil / oilknife）与 `dry`（干性铅笔／炭条）。默认继承当前材料；需要更换时显式设置 `project_material`。切换把当前可见图像固定为下一阶段的底图，旧材料状态仍保存在保留的历史步骤中。它不是图层编辑器，不模拟湿油彩与炭粉的物理混合，也不会把固定底图反解为可擦揉或湿混材料。
+同一工程可交替使用油画笔、调色刀、石墨、炭笔、墨水、钢笔、毛刷和马克笔，并保留已有的湿油彩、干性材料和普通笔迹。下一次调用可以直接选笔。每次成功调用保存整个画布和相应材料状态。
 
-Since 1.4.0 one project can **alternate wet and dry phases**. Calls inherit the active medium unless `project_material` explicitly selects `wet` or `dry`. A switch fixes the visible image as the next phase's base; the previous editable material state remains in retained history. This is not a layer editor, wet-pigment/charcoal interaction simulation or reconstruction of material from flattened pixels.
+A single project can alternate between oil, palette knife, graphite, charcoal, ink, fountain pen, brush and marker while retaining existing oil, dry pigment and raster marks. Choose another tool on the next call. Each successful call saves the complete canvas and its material state.
+
+## 新建空白画布 / Create a blank canvas
+
+只给出工程名即可创建空白画布，可选设定尺寸与纸面 / Give the project a name and optionally set its size and surface:
+
+```json
+{
+  "project": "blank-study.qlproject",
+  "width": 900,
+  "height": 600,
+  "surface": "linen"
+}
+```
+
+之后继续使用同一个工程路径。工程尺寸随首个画布保存 / Reuse the same project path on subsequent calls. The project retains the initial canvas dimensions.
 
 ## 默认保留策略 / Retention defaults
 
@@ -64,11 +79,11 @@ Defaults retain the **30 most recent unpinned automatic steps**, configurable fr
 {"project":"still-life.qlproject","action":"dry_paint"}
 ```
 
-这会把当前油彩标记为已干并另存为新的工程步骤，原有 PNG、颜料颜色与厚度不变；继续用油画笔时不会从这层已干颜料拾色。无需等待现实时间。这不是切换到 `project_material:"dry"`：后者是石墨／炭笔阶段，并会将画面固定为底图。干化只作用于当前湿油画 head，不支持选取历史步；如需先回到历史，请先 restore。正常历史清理规则仍然适用：若需要保证可以恢复干化前的湿状态，应在干化前给该步骤建立命名检查点或先分支备份。
+这会把当前步骤中的油彩标记为已干并保存新一步，保留 PNG、颜料颜色和厚度。干化立即生效，之后的油画笔会跳过这层已干颜料的湿拾色。即使上一轮用的是石墨、炭笔或普通笔刷，只要当前工程有油彩，就可以干化。要干化某个历史状态，先用 `restore` 回到该步。干化步骤遵循同样的历史保留策略。
 
 旧 `.qlpaint` 可先导入一个新湿工程，再干化；原快照不会修改。新版可读取旧工程和快照，但旧版本可能无法正确解释新版干化后的湿度标记，因此降级前请备份并保留原工程。旧版本若已发生笔画年龄循环混淆，无法推断真实历史；新版本无法复原此前已经丢失的信息。
 
-In a wet oil project, `quiet_line_project` action `dry_paint` saves the current oil as a new dry-paint step without changing its PNG, pigment colour or relief. No real-time waiting is simulated. This is not `project_material:"dry"`, which switches to graphite/charcoal and fixes the image as a base. Only the current wet head can be dried. Normal retention applies: pin a checkpoint or branch before drying if the wet state must remain recoverable. Old `.qlpaint` snapshots can be imported into a new wet project first without modifying the source. The new engine reads old state, but older versions may not interpret the new dry marker correctly; back up before downgrading. Previously lost age information after a legacy wrap cannot be reconstructed.
+`quiet_line_project` action `dry_paint` immediately marks the current oil as dry in a new step, preserving the PNG, pigment colour and relief. Subsequent oil strokes skip wet pickup from that dried paint. The action works after a dry-media or raster pass as long as the current state includes oil. To dry an earlier state, restore that step first. The usual history retention rules apply. You can also import an older `.qlpaint` snapshot into a new project and then dry it.
 
 ## 开始干性材料工程 / Start a dry project
 
@@ -86,22 +101,21 @@ In a wet oil project, `quiet_line_project` action `dry_paint` saves the current 
 }
 ```
 
-此后仅需 `project` 和新的 `operations`。材料模式自动继承；恢复材料时仍遵守原状态的尺寸、纸面等约束。`project_history_limit` 和 `project_max_mb` 省略时继承现值，显式提供时调整保留策略；检查点不会因此被静默删除。
+下次传同一个 `project` 和新的 `operations`，即可继续叠加、擦除或擦揉工程中的干性材料。`project_history_limit` 和 `project_max_mb` 省略时继承现值，显式提供时调整保留策略。命名检查点独立保留。
 
-Later calls need only `project` and new `operations`. Mode is inherited, and original state constraints such as dimensions and substrate still apply. Retention settings inherit when omitted; explicit values adjust the policy without silently dropping named checkpoints.
+Reuse `project` with new `operations` to deposit, erase or smudge dry pigment already in the project. Retention settings inherit when omitted. Explicit values adjust the policy while keeping named checkpoints pinned.
 
 ## 在同一工程交替用干湿材料 / Alternate media in one project
 
-`project_material` 为 `dry` 或 `wet`，只可与 `project` 一起使用。省略时继承当前模式，不能仅凭传入另一种笔画偷偷固化工程。显式切换为湿画且未指定 `brush` 时使用油画笔。一个调用只操作一种材料；交替调用即可，不在同一调用混传 `operations` 与油画 `strokes`。
+传 `brush` 选择下一轮笔刷，或用 `operations` 执行干性材料操作。省略笔刷时可延续上一轮笔刷。旧脚本可继续使用 `project_material:"wet"` 或 `"dry"` 提示默认笔刷。显式指定的 `brush` 优先。干性 `operations` 与油彩 `strokes` 分调用提交。
 
-`project_material` selects `dry` or `wet` and requires `project`. Omission inherits the active mode; another kind of mark does not silently flatten a project. Explicit wet creation/switching defaults to the oil brush. One call operates in one material; alternate calls rather than mixing dry `operations` and oil `strokes` in one call.
+Pass `brush` to select a tool for the next pass, or use `operations` for dry-media actions. You can omit the brush to continue with the previous tool. Existing scripts can still pass `project_material:"wet"` or `"dry"` to suggest a default. An explicit `brush` takes priority. Submit dry `operations` and oil `strokes` in separate calls.
 
 先用炭笔起型 / Start with charcoal construction:
 
 ```json
 {
   "project": "mixed-study.qlproject",
-  "project_material": "dry",
   "size": 320,
   "operations": [{"tool": "charcoal", "points": [[0.3, 0.7], [0.5, 0.3], [0.7, 0.7]], "width": 4, "pressure": 0.25}],
   "project_checkpoint": "Charcoal construction"
@@ -113,7 +127,7 @@ Later calls need only `project` and new `operations`. Mode is inherited, and ori
 ```json
 {
   "project": "mixed-study.qlproject",
-  "project_material": "wet",
+  "brush": "oil",
   "load": 20,
   "impasto": 10,
   "strokes": [{"points": [[0.35, 0.6], [0.65, 0.6]], "width": 18, "opacity": 0.25, "color": "ochre"}],
@@ -126,18 +140,17 @@ Later calls need only `project` and new `operations`. Mode is inherited, and ori
 ```json
 {
   "project": "mixed-study.qlproject",
-  "project_material": "dry",
   "operations": [{"tool": "pencil", "points": [[0.32, 0.71], [0.68, 0.71]], "width": 2, "pressure": 0.45}]
 }
 ```
 
-**切换边界：** 每次更换材料，会把上一阶段 PNG 固定为新材料的底图；尺寸不变。新阶段的橡皮只能移走本阶段新材料，不能擦掉已固定的油画或炭笔；湿画拾色也不能恢复旧阶段的湿度。相同模式连续调用则仍保留可擦揉材料或湿混状态，不重复固化。历史列表逐步骤标明材料；恢复或分支会回到该步真正的材料状态，导出快照的扩展名也按**所选步骤**而非当前头部决定。命名切换前的重要步骤，防止被正常保留策略清理。
+换笔后，干性材料仍可擦除和擦揉，已有油彩仍按其湿度参与拾色。普通笔迹与各材料自动合成，干性橡皮作用于石墨和炭粉，油画笔从油彩拾色。工程管理工具以整幅画布和材料快照为操作单位，可恢复、分支或导出合成 PNG。
 
-**Switch boundary:** each change fixes the previous PNG as the new medium's base, preserving dimensions. Erasers remove only new dry marks; old fixed oils/charcoal are not erasable, and wet pickup cannot recover an earlier phase's wetness. Same-mode calls keep the live material without re-flattening. History identifies each step's material; restore/branch revives that step's real state. Snapshot export uses the **selected step's** mode, not the current head. Pin important pre-switch steps against ordinary retention pruning.
+Dry pigment stays erasable and smudgeable after a tool change. Existing oil retains its wetness for later pickup. Quiet Line composites ordinary marks with both materials. An eraser works on graphite and charcoal, and oil brushes pick up oil paint. Project tools act on the whole canvas or on material snapshots. Restore or branch the complete canvas, or export the composite PNG or one material snapshot from a selected step.
 
-**兼容：** 1.3 工程只读和同模式写仍保持原格式；首次显式材料切换才在事务中升级格式。新建／分支工程使用新格式。1.3 不能读取新格式；升级后不要用旧插件打开新工程。迁移前备份重要旧工程。
+旧湿画、干画工程可以直接读取与继续绘制。首次保存新版混合状态时，工程在事务内升级并保留旧的历史步骤。旧文件中已固化的底图仍作为底图使用。旧插件可能无法打开包含混合步骤的工程。
 
-**Compatibility:** reading or same-mode editing of a 1.3 project preserves its old format. Its first explicit material switch upgrades transactionally. New/branched projects use the new format, which 1.3 cannot read. Back up important old projects before migrating; use the updated plugin for new-format files.
+Existing wet and dry projects can be read and continued. The first save of a mixed state upgrades the project in a transaction and retains earlier history steps. Substrates fixed by older releases remain available as base imagery. Older engines may be unable to open projects with mixed steps.
 
 ## 历史、恢复与分支 / History, restore and branch
 
@@ -150,10 +163,11 @@ Use **`quiet_line_project`**. Always provide `project`; use actual step IDs from
 | `list` | — | 列出当前步骤、历史、检查点和容量设置 / List head, history, checkpoints and limits |
 | `checkpoint` | `step`（省略为当前 / default head）, `label` | 为该步骤命名并保留 / Name and pin a step |
 | `delete_checkpoint` | `step`（省略为当前 / default head） | 取消长期保留，不代表立刻删除该步骤 / Unpin, not necessarily immediately delete the step |
-| `restore` | `step` | 切换当前材料到已有步骤，不删除之后的历史 / Move head to an existing step without deleting later history |
+| `restore` | `step` | 恢复所选画布，保留之后的历史 / Restore the selected canvas while keeping later history |
 | `prune` | `history_limit`, `max_mb`（均可省略 / optional） | 调整策略并立即清理可清理历史 / Apply retention and prune eligible history |
 | `branch` | `step`（省略为当前 / default head）, `target` | 以所选状态另存一个新工程，不修改原工程 / Create a new project from one selected state, source unchanged |
-| `export` | `step`（省略为当前 / default head）, `target` | 导出 PNG 或对应模式快照 / Export PNG or the mode's standalone snapshot |
+| `export` | `step`（省略为当前 / default head）, `target` | 导出合成 PNG 或所选步骤的材料快照 / Export the composite PNG or a material snapshot from the selected step |
+| `dry_paint` | — | 干化当前步骤中的油彩 / Dry oil paint in the current step |
 | `recover` | — | 显式恢复中断写入的 SQLite 事务并检查工程，不生成新步骤 / Explicitly recover an interrupted SQLite transaction and check the project, without adding a step |
 
 ```json
@@ -180,9 +194,9 @@ Use **`quiet_line_project`**. Always provide `project`; use actual step IDs from
 
 Drawing after restore creates a new step ID whose parent is the restored step. Later old steps are not immediately discarded by restore, but remain subject to normal retention. Pin important alternatives or branch them into separate projects.
 
-导出快照时，所选历史步骤为湿画则使用 `.qlpaint`，为干性材料则使用 `.qldry`；PNG 使用 `.png`。新工程、分支和导出只写入工作目录内，不覆盖已有目标。导出父目录须已存在。
+用 `.png` 导出完整画面，用 `.qlpaint` 或 `.qldry` 导出所选步骤中的油彩或干性材料快照。用 `branch` 保留所有材料状态。新工程、分支和导出只写入工作目录内，需使用新的目标路径。导出父目录须已存在。
 
-Export `.qlpaint` for wet material, `.qldry` for dry material, or `.png` for the preview. Project creation, branches and exports stay within the session working directory and never overwrite existing output targets. Export parent directories must exist.
+Export `.png` for the composite artwork, or `.qlpaint` or `.qldry` for a snapshot of oil or dry pigment in the selected step. Use `branch` to keep all material states together. Project creation, branches and exports require new targets within the session working directory. Export parent directories must exist.
 
 ## 导入旧快照 / Import old snapshots
 

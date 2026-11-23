@@ -184,13 +184,13 @@ When restoring, omit fixed canvas, surface, seed and grain choices so the snapsh
 - `.qldry` 独立于 `.qlpaint`，使用带版本和校验的有界状态数据，不反序列化可执行代码。不要靠改扩展名互转。
 - `save_dry_state` 显式请求状态保存；未请求时不要假设 PNG 旁总有可恢复状态。
 - 状态输出在工作目录内，父目录必须已经存在，并以新文件保存，不覆盖旧文件；为每个检查点使用不同文件名。拒绝 `../` 与符号链接／junction 导致的目录逃逸。保留旧节点便于回退与分支，这不是任意单笔撤销或可编辑图层。
-- 每轴最多 1800 像素；每次最多 600 个操作，每条路径最多 400 点，总点数最多 40,000。状态数组最多 51,840,000 字节；压缩与解压数据有 52 MiB 边界，头部最多 16 KiB。它不是可无限增长的历史日志。
+- 每轴最多 2560 像素；每次最多 600 个操作，每条路径最多 400 点，总点数最多 40,000。状态数组最多 100 MiB，压缩与解压数据上限 104 MiB，头部最多 16 KiB。它不是可无限增长的历史日志。
 - 保存／加载、PNG 编码仍有画布大小相关成本。局部操作不会让整张图的输出变成常数时间；避免无目的反复导出。
 
 - `.qldry` is separate from `.qlpaint`: versioned, validated, bounded state data, not executable deserialization. Renaming the extension does not convert a format.
 - Request `save_dry_state` explicitly; a PNG does not imply that a restorable material state was saved beside it.
 - State outputs stay within the working directory, require existing parent directories and create new files without overwriting. Give checkpoints distinct names. Escapes through parent traversal or symlinks/junctions are rejected. Retaining checkpoints enables call-level rollback and branches, not arbitrary stroke undo or editable layers.
-- Each axis is at most 1800 pixels. A call accepts at most 600 operations, 400 points per path and 40,000 points in total. State arrays total at most 51,840,000 bytes; compressed and decompressed data are bounded at 52 MiB with a 16 KiB header limit. This is not an indefinitely growing history log.
+- Each axis is at most 2560 pixels. A call accepts at most 600 operations, 400 points per path and 40,000 points in total. State arrays total at most 100 MiB. Compressed and decompressed data are bounded at 104 MiB, with a 16 KiB header limit. This is not an indefinitely growing history log.
 - State I/O and PNG encoding still have canvas-sized costs. Local painting does not make complete exports constant-time; avoid purposeless repeated exports.
 
 ## 练习顺序与局限 / Practice order and limitations

@@ -17,7 +17,7 @@
 
 有时候，一张画比一段描述更合适。
 
-Quiet Line 给 DSH 里的 AI 一张画布和一套画笔。你说想画什么，它来安排构图、选择颜色，一笔一笔画下来，再把完成的图片交给你。
+Quiet Line 是给 DSH 里的 AI 用的画板，主要模拟真实绘画材料的落笔表现。你说想画什么，AI 来安排构图、选择颜色，再用这些画具一笔一笔画出来。
 
 可以是一片傍晚的湖，一只系着围巾的小猫，也可以只是桌上那杯还冒着热气的茶。不需要你先写坐标，也不用另外接入生图服务。
 
@@ -41,10 +41,10 @@ Quiet Line 给 DSH 里的 AI 一张画布和一套画笔。你说想画什么，
 
 ## 几支画笔，几种不同的心情
 
-- **钢笔与墨线**：画轮廓、速写，或简洁的小插画。
-- **铅笔与炭笔**：轻一点、粗糙一点，留下纸上的颗粒。
-- **毛刷与马克笔**：铺色、叠色，保留手绘的松动感。
-- **油画笔与画刀**：让颜料堆起来，在交叠处拾色、混色，留下刷痕与厚度。
+- **钢笔与墨线**：用清晰的线缘和变化的笔压画轮廓或速写。
+- **铅笔与炭笔**：按压时，石墨与炭粉随纸齿留下颗粒，可以用橡皮提亮，也可以擦揉散开。
+- **毛刷与马克笔**：毛刷留下刷丝纹，半透明的马克笔可以叠色。
+- **油画笔与画刀**：从湿颜料中拾色，在交叠处混色，并留下刷痕和厚度。可以先让油彩干化，再继续添画。
 
 可以换上暖白纸、冷压纸、牛皮纸、亚麻布、新闻纸或深色画纸。同一个题材，换一套画具，感觉也会不同。
 
@@ -52,11 +52,11 @@ Quiet Line 给 DSH 里的 AI 一张画布和一套画笔。你说想画什么，
 
 ## 1.4.1：让油彩先干化，再继续画
 
-在湿油画工程中可以让 AI 显式“干化当前油彩”，不必等现实时间。画面、颜色和厚度保持不变，之后添画不再从已干油彩拾色。干化会新增一个工程步骤，并遵循工程历史的正常清理规则；想确保能回到干化前的湿状态，请先设命名检查点或另存分支。它不同于切换到石墨／炭笔材料。旧工程可在新版读取；旧版插件不能保证正确解释新版干化标记，降级前请备份。详见[工程指南](PROJECTS.md)。
+有油彩的工程可以显式“干化当前油彩”。干化立即生效并新增一个工程步骤，保留画面、颜色和厚度。之后添画时，已干油彩不会参与湿拾色。如需长期保留干化前的湿状态，可设置命名检查点或另存分支。详见[工程指南](PROJECTS.md)。
 
-## 1.4.0：材料可以换，画面结构要立住
+## 在一幅画里交替用笔
 
-同一个工程现在可以先用炭笔起型，再薄涂油彩，之后用干性材料加线。显式切换材料时，上阶段画面固定为底图，旧可编辑状态保留在历史里；同材料续画不固化。**不模拟干湿物理混合，也不是可编辑图层。** 详见[工程指南](PROJECTS.md)。
+可从空白工程开始，先用炭笔起型，再用油画笔和调色刀薄涂，随后换成毛刷或马克笔加细节。各材料的状态随工程保存，返回炭笔时仍可擦揉已有炭粉，返回油彩时已有湿颜料仍可拾色。详见[工程指南](PROJECTS.md)。
 
 所有画笔的整体笔宽倍率放宽为 **0.1..30**，逐点局部倍率仍为 **0..3**，不是像素值。内置指导强化构图、透视、漫反射／高光与明暗结构，鼓励灵活借鉴真实作画阶段；必要时可用参考图或三辅二辅助，不强制固定流程。薄涂用低不透明度、低负载颜料作视觉近似。详见[绘画方法](DRAWING.md)与[笔触说明](CONTROL.md)。
 
@@ -100,13 +100,13 @@ Quiet Line 是给 AI 使用的轻量画具，不是 Photoshop，也不是完整�
 
 ## Dry oil before continuing
 
-In a wet oil project, ask the AI to dry the current oil paint explicitly before the next layer. This preserves the visible picture, colour and relief, and prevents pickup from dried paint. It records a new project step, subject to normal retention: pin a checkpoint or branch first if the wet state must remain recoverable. This is not a switch to graphite or charcoal. New versions can read old projects, but older engines may not interpret the new dry marker correctly; back up before downgrading. See [projects](PROJECTS.md).
+In a project containing oils, ask the AI to dry the current oil paint before adding more marks. Drying takes effect immediately and records a new step. It preserves the artwork, colour and relief, and subsequent strokes skip wet pickup from the dried paint. Pin a checkpoint or branch to keep a recoverable wet state. See [projects](PROJECTS.md).
 
 ## Let your AI draw something for you
 
 Sometimes a picture is a better answer.
 
-Quiet Line gives the AI in DSH a canvas and a set of brushes. Tell it what you have in mind; it can plan the composition, choose its colours, lay down strokes and share the finished picture with you.
+Quiet Line is a drawing board for DSH that simulates the behaviour of traditional art materials. Tell the AI what you have in mind and it can plan the composition, choose its colours and draw it stroke by stroke.
 
 A lake at dusk. A cat in a red scarf. A cup of tea by the window. You don't need to write coordinates or connect a separate image-generation service.
 
@@ -126,13 +126,13 @@ For wet oil pickup and mixing across calls, ask the AI to **save one drawing pro
 
 ### Pick a different feel
 
-Eight brushes cover ink, fountain pen, pencil, charcoal, brush, marker, oil and palette knife. Six surfaces range from warm drawing paper to woven linen and dark charcoal paper. Oil strokes can pick up earlier pigment, mix colours and build raised paint.
+Ink and fountain pens respond to pressure with distinct line edges. Bristle brushes leave streaks and translucent marker marks can build up with each pass. Graphite and charcoal settle into the paper tooth and can be erased or smudged. Oil brushes and palette knives pick up wet pigment, build raised paint and support drying before the next pass. Six surfaces range from warm drawing paper to woven linen and dark charcoal paper.
 
 For more deliberate marks, the tool offers per-point pressure, width and opacity; wet oils also simulate rotated and tilted flat tips, edge hardness and flow. You don't need to learn the parameters to get started. See the [controls guide](CONTROL.md) for legacy strokes and wet oils, including JSON examples and implementation limits.
 
-### 1.4.0: change media, strengthen the structure
+### Use different tools on one canvas
 
-One project can now move from charcoal construction to thin oils and back to dry accents. Explicit material switches fix the previous image as the next phase's base, while retaining earlier editable states in history. Same-mode calls keep their simulation. **This is not wet/dry physical interaction or editable layers.** See the [project guide](PROJECTS.md).
+Start with a blank project, sketch in charcoal, lay in oils with a brush and palette knife, then add details in ink or marker. The project keeps each material state across brush changes. When you return to charcoal, earlier dry pigment can still be smudged. When you return to oil, the earlier wet oil remains available for pickup. See the [project guide](PROJECTS.md).
 
 Overall stroke width now accepts **0.1..30** for all brushes; per-point width stays **0..3**. These are multipliers, not pixels. Built-in guidance emphasizes composition, perspective, diffuse/specular light and value structure, with adaptable painting stages and optional references/3D-to-2D aids. Low-opacity, low-load paint visually approximates thin washes, not solvent chemistry. See [drawing practice](DRAWING.md) and [controls](CONTROL.md).
 

@@ -18,7 +18,7 @@ for (const [name, pattern] of [
   ['low-load depletion caveat', /Low load can run dry early[\s\S]*keep enough load and lower opacity\/impasto/],
   ['3D-to-2D aids and inspection', /3D-to-2D aids[\s\S]*Actually inspect aids/],
   ['reference constraints', /permissions and user constraints[\s\S]*paid services, uploads or software installation/],
-  ['mixed project limits', /project_material[\s\S]*history, not as an editable layer[\s\S]*physical interaction is not modeled/],
+  ['mixed project materials', /retain their separate states across tool changes[\s\S]*dry pigment remains erasable and smudgeable/],
   ['width multipliers', /width is a multiplier, not pixels \(0\.1\.\.30\); controls\.width[\s\S]*\(0\.\.3\)/],
   ['purposeful iteration', /Do not fear overworking[\s\S]*Do not loop indefinitely/]
 ]) assert.match(ART_GUIDANCE, pattern, name);

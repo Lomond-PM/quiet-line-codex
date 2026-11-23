@@ -86,9 +86,9 @@ async function executeDry(args,exec,h) {
   if(!Object.hasOwn(CORE.SURFACES,surface)) fail('unknown surface');
   const seed=integerIn(args.seed,m?.seed??241,1,9999,'seed');
   const baseImage=args.base_image==null?undefined:await loadBaseImage(cwd,args.base_image,args);
-  const size=m||baseImage?undefined:integerIn(args.size,1200,320,1800,'size');
-  const width=m?.width??baseImage?.width??integerIn(args.width,size,320,1800,'width');
-  const height=m?.height??baseImage?.height??integerIn(args.height,size,320,1800,'height');
+  const size=m||baseImage?undefined:integerIn(args.size,1200,320,CORE.MAX_CANVAS_SIDE,'size');
+  const width=m?.width??baseImage?.width??integerIn(args.width,size,320,CORE.MAX_CANVAS_SIDE,'width');
+  const height=m?.height??baseImage?.height??integerIn(args.height,size,320,CORE.MAX_CANVAS_SIDE,'height');
   let accent=previous?.accent??undefined;
   if(args.accent!=null) {
     if(typeof args.accent!=='string'||!/^#[0-9a-f]{6}$/i.test(args.accent)) fail('accent must be #rrggbb');

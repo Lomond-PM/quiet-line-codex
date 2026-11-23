@@ -1,5 +1,15 @@
 # Changelog / 更新记录
 
+## 1.5.0 — 2026-11-23
+
+- 可以创建空白工程，并在同一画布上交替使用全部八种画笔。工程保留油彩、干性材料和普通笔迹，换笔后可以继续湿拾色、擦除与擦揉。
+- 支持打开旧湿画、干画工程以及导入独立的材料快照。混合工程可导出整幅 PNG、提取单种材料快照，也可用分支保留完整工程。
+- 画布每边最高 2560 像素。
+
+- Start a blank project and use all eight brushes on the same canvas. Projects retain oil, dry pigment and raster marks across tool changes, with continued wet pickup, erasing and smudging.
+- Continue existing wet and dry projects and import standalone material snapshots. Export the full PNG or one material snapshot, or branch to keep all material states.
+- The canvas supports up to 2560 pixels per side.
+
 ## 1.4.1 — 2026-11-20
 
 - 修复湿油彩年龄循环导致旧颜料返湿、油画拾色及不透明度等问题；保留受控油刷既有默认笔形，避免无关的风格变化。

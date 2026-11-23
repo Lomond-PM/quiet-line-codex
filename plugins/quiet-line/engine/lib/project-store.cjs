@@ -10,9 +10,12 @@ const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 const MiB = 1024 * 1024;
 const APP_ID = 0x514c5052;
-const VERSION = 2;
+const MIXED_VERSION = 3;
+const PER_STEP_VERSION = 2;
 const LEGACY_VERSION = 1;
-const MAX_STATE = 224 * MiB, MAX_PNG = 32 * MiB, MAX_INFO = 16384;
+const MAX_STATE = 320 * MiB + 16 * 1024 + 12;
+const MAX_MIXED_STATE = 576 * MiB;
+const MAX_PNG = 32 * MiB, MAX_INFO = 16384;
 const MIN_CAPACITY = 64 * MiB, MAX_CAPACITY = 8 * 1024 * MiB;
 const OVERHEAD = 16 * MiB;
 const PNG_MAGIC = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
@@ -26,7 +29,10 @@ const SCHEMA = {
 const STEP_SCHEMAS = Object.fromEntries(['wet', 'dry'].map(mode => [mode,
   SCHEMA.steps.slice(0, -1) + `, mode TEXT NOT NULL DEFAULT '${mode}')`
 ]));
-function supportedVersion(version) { return version === LEGACY_VERSION || version === VERSION; }
+function supportedVersion(version) {
+  return version === LEGACY_VERSION || version === PER_STEP_VERSION || version === MIXED_VERSION;
+}
+function stateByteLimit(mode) { return mode === 'mixed' ? MAX_MIXED_STATE : MAX_STATE; }
 function fail(message, code = 'ERR_PROJECT_INVALID') {
   const error = new Error(`Quiet Line project: ${message}`); error.code = code; throw error;
 }
@@ -75,8 +81,9 @@ function jsonInfo(info) {
   return json;
 }
 function payload(options) {
-  if (options.mode !== 'wet' && options.mode !== 'dry') fail('mode must be wet or dry');
-  if (!Buffer.isBuffer(options.state) || !options.state.length || options.state.length > MAX_STATE) fail('state must be a nonempty Buffer <=224 MiB');
+  if (!['wet', 'dry', 'mixed'].includes(options.mode)) fail('mode must be wet, dry or mixed');
+  const maxState = stateByteLimit(options.mode);
+  if (!Buffer.isBuffer(options.state) || !options.state.length || options.state.length > maxState) fail(`state must be a nonempty Buffer up to ${maxState} bytes`);
   if (!Buffer.isBuffer(options.png) || options.png.length < 8 || options.png.length > MAX_PNG || !options.png.subarray(0, 8).equals(PNG_MAGIC)) fail('png must be a PNG Buffer <=32 MiB');
   return { mode: options.mode, state: options.state, png: options.png, info: jsonInfo(options.info), label: labelValue(options.label, true) };
 }
@@ -145,15 +152,16 @@ function validate(db, file, changed = false) {
   if (scalar(db, 'journal_mode') !== 'delete' || scalar(db, 'auto_vacuum') !== 1) fail('unsupported journal/auto_vacuum configuration');
   const schemaBounds = db.prepare('SELECT count(*) AS n,max(length(CAST(sql AS BLOB))) AS longest FROM sqlite_schema').get();
   if (schemaBounds.n !== 2 || schemaBounds.longest > 1024) fail('unsupported/oversized schema');
+  const perStep = version >= PER_STEP_VERSION;
+  const allowedModes = version === MIXED_VERSION ? "'wet','dry','mixed'" : "'wet','dry'";
   const schema = db.prepare('SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY name').all();
   if (schema.length !== 2 || schema.some(r => r.type !== 'table' || r.tbl_name !== r.name ||
-    (version === VERSION && r.name === 'steps' ? !Object.values(STEP_SCHEMAS).includes(r.sql) : SCHEMA[r.name] !== r.sql))) fail('unsupported schema (tables, indexes, views, triggers must match)');
-  const unsafeMeta = db.prepare("SELECT count(*) AS n FROM project WHERE typeof(mode)!='text' OR length(CAST(mode AS BLOB))!=3 OR typeof(singleton)!='integer' OR typeof(head)!='integer' OR typeof(revision)!='integer' OR typeof(historyLimit)!='integer' OR typeof(maxBytes)!='integer' OR typeof(nextId)!='integer'").get().n;
+    (perStep && r.name === 'steps' ? !Object.values(STEP_SCHEMAS).includes(r.sql) : SCHEMA[r.name] !== r.sql))) fail('unsupported schema (tables, indexes, views, triggers must match)');
+  const unsafeMeta = db.prepare(`SELECT count(*) AS n FROM project WHERE typeof(mode)!='text' OR length(CAST(mode AS BLOB))>5 OR mode NOT IN (${allowedModes}) OR typeof(singleton)!='integer' OR typeof(head)!='integer' OR typeof(revision)!='integer' OR typeof(historyLimit)!='integer' OR typeof(maxBytes)!='integer' OR typeof(nextId)!='integer'`).get().n;
   if (unsafeMeta) fail('invalid project metadata types/lengths');
   const rows = db.prepare('SELECT * FROM project LIMIT 2').all();
   if (rows.length !== 1 || rows[0].singleton !== 1) fail('invalid project metadata');
   const m = rows[0];
-  if (m.mode !== 'wet' && m.mode !== 'dry') fail('invalid mode');
   integer(m.head, 1, Number.MAX_SAFE_INTEGER - 1, 'head');
   integer(m.revision, 1, Number.MAX_SAFE_INTEGER - 1, 'revision');
   integer(m.nextId, 2, Number.MAX_SAFE_INTEGER - 1, 'nextId');
@@ -168,14 +176,14 @@ function validate(db, file, changed = false) {
   if (count < 1 || count > 564) fail('invalid history count');
   const unsafeSteps = db.prepare("SELECT count(*) AS n FROM steps WHERE (parentId IS NOT NULL AND typeof(parentId)!='integer') OR typeof(bytes)!='integer' OR typeof(pinned)!='integer' OR typeof(createdAt)!='text' OR (label IS NOT NULL AND typeof(label)!='text')").get().n;
   if (unsafeSteps) fail('invalid step metadata types');
-  const lengths = db.prepare("SELECT id, typeof(state) AS st, length(state) AS sl, typeof(png) AS pt, length(png) AS pl, typeof(info) AS it, length(CAST(info AS BLOB)) AS il, length(CAST(label AS BLOB)) AS ll, length(CAST(createdAt AS BLOB)) AS cl FROM steps ORDER BY id").all();
+  // Check mode types and lengths in SQL before selecting any untrusted value.
+  if (perStep && db.prepare(`SELECT count(*) AS n FROM steps WHERE typeof(mode)!='text' OR length(CAST(mode AS BLOB))>5 OR mode NOT IN (${allowedModes})`).get().n) fail('invalid step mode');
+  const lengths = db.prepare(`SELECT id, typeof(state) AS st, length(state) AS sl, typeof(png) AS pt, length(png) AS pl, typeof(info) AS it, length(CAST(info AS BLOB)) AS il, length(CAST(label AS BLOB)) AS ll, length(CAST(createdAt AS BLOB)) AS cl${perStep ? ',mode' : ''} FROM steps ORDER BY id`).all();
   for (const r of lengths) {
-    if (r.st !== 'blob' || !Number.isSafeInteger(r.sl) || r.sl < 1 || r.sl > MAX_STATE || r.pt !== 'blob' || !Number.isSafeInteger(r.pl) || r.pl < 8 || r.pl > MAX_PNG || r.it !== 'text' || r.il < 2 || r.il > MAX_INFO || (r.ll !== null && r.ll > 480) || r.cl !== 24) fail('invalid/oversized stored BLOB or metadata length');
+    if (r.st !== 'blob' || !Number.isSafeInteger(r.sl) || r.sl < 1 || r.sl > stateByteLimit(r.mode ?? m.mode) || r.pt !== 'blob' || !Number.isSafeInteger(r.pl) || r.pl < 8 || r.pl > MAX_PNG || r.it !== 'text' || r.il < 2 || r.il > MAX_INFO || (r.ll !== null && r.ll > 480) || r.cl !== 24) fail('invalid/oversized stored BLOB or metadata length');
   }
-  // Check mode type and length in SQL before materializing any untrusted value.
-  if (version === VERSION && db.prepare("SELECT count(*) AS n FROM steps WHERE typeof(mode)!='text' OR length(CAST(mode AS BLOB))!=3 OR mode NOT IN ('wet','dry')").get().n) fail('invalid step mode');
-  const steps = db.prepare(`SELECT id,parentId,createdAt,label,bytes,pinned,info${version === VERSION ? ',mode' : ''} FROM steps ORDER BY id`).all();
-  if (version === LEGACY_VERSION) for (const step of steps) step.mode = m.mode;
+  const steps = db.prepare(`SELECT id,parentId,createdAt,label,bytes,pinned,info${perStep ? ',mode' : ''} FROM steps ORDER BY id`).all();
+  if (!perStep) for (const step of steps) step.mode = m.mode;
   let total = 0, pins = 0, automatic = 0;
   for (let i = 0; i < steps.length; i++) {
     const r = steps[i], l = lengths[i];
@@ -204,9 +212,12 @@ function selected(db, m, id) {
   id = id === undefined ? m.head : integer(id, 1, Number.MAX_SAFE_INTEGER - 1, 'step');
   if (!m.steps.some(s => s.id === id)) fail(`step ${id} not found`, 'ERR_PROJECT_STEP');
   const row = db.prepare('SELECT id,state,png,info FROM steps WHERE id=?').get(id);
-  const png = Buffer.from(row.png);
+  const png = Buffer.from(row.png.buffer, row.png.byteOffset, row.png.byteLength);
   if (!png.subarray(0, 8).equals(PNG_MAGIC)) fail('invalid stored PNG signature');
-  return { id: row.id, mode: m.steps.find(s => s.id === id).mode, state: Buffer.from(row.state), png, info: JSON.parse(row.info) };
+  // SQLite returns owned byte arrays. Wrap them without copying potentially
+  // hundreds of MiB into a second allocation.
+  const state = Buffer.from(row.state.buffer, row.state.byteOffset, row.state.byteLength);
+  return { id: row.id, mode: m.steps.find(s => s.id === id).mode, state, png, info: JSON.parse(row.info) };
 }
 function readProject(cwd, requested, { step, includeData = false } = {}) {
   const file = resolvePath(cwd, requested, false); let db;
@@ -237,7 +248,7 @@ function prune(db, head, limits) {
 }
 function addStep(db, id, parentId, p) {
   const bytes = p.state.length + p.png.length + Buffer.byteLength(p.info) + (p.label ? Buffer.byteLength(p.label) : 0) + 128;
-  const perStep = scalar(db, 'user_version') === VERSION;
+  const perStep = scalar(db, 'user_version') >= PER_STEP_VERSION;
   db.prepare(`INSERT INTO steps (id,parentId,createdAt,label,bytes,pinned,state,png,info${perStep ? ',mode' : ''}) VALUES (?,?,?,?,?,?,?,?,?${perStep ? ',?' : ''})`)
     .run(id, parentId, new Date().toISOString(), p.label, bytes, p.label ? 1 : 0, p.state, p.png, p.info, ...(perStep ? [p.mode] : []));
 }
@@ -266,7 +277,8 @@ function create(cwd, requested, p, limits) {
   try {
     const fd = fs.openSync(temporary, 'wx', 0o600); ownsTemporary = true; fs.closeSync(fd);
     db = new DatabaseSync(temporary, { enableDoubleQuotedStringLiterals: false, allowExtension: false });
-    db.exec(`PRAGMA trusted_schema=OFF; PRAGMA journal_mode=DELETE; PRAGMA auto_vacuum=FULL; PRAGMA application_id=${APP_ID}; PRAGMA user_version=${VERSION};`);
+    const version = p.mode === 'mixed' ? MIXED_VERSION : PER_STEP_VERSION;
+    db.exec(`PRAGMA trusted_schema=OFF; PRAGMA journal_mode=DELETE; PRAGMA auto_vacuum=FULL; PRAGMA application_id=${APP_ID}; PRAGMA user_version=${version};`);
     db.exec(`${SCHEMA.project}; ${STEP_SCHEMAS.wet}; BEGIN IMMEDIATE;`);
     addStep(db, 1, null, p);
     db.prepare('INSERT INTO project VALUES (1,?,?,?,?,?,?)').run(p.mode, 1, 1, limits.historyLimit, limits.maxBytes, 2);
@@ -293,11 +305,16 @@ function commitProject(cwd, requested, options) {
   const file = resolvePath(cwd, requested, true);
   return mutate(file, options.expectedRevision, (db, m) => {
     if (p.mode !== m.mode && options.allowModeSwitch !== true) fail('project mode cannot change without allowModeSwitch:true');
-    // Reads, recovery and same-mode legacy writes stay V1. Upgrade only for an
-    // explicitly authorized switch, after CAS and inside this mutation's rollback
-    // transaction. The validated mode is a finite SQL literal, never caller SQL.
+    // The first mode switch adds the per-step mode to a v1 database. The first
+    // mixed payload needs v3 but uses the same tables as v2. Both upgrades are
+    // inside the save transaction so a failed commit leaves the original intact.
     if (p.mode !== m.mode && m.version === LEGACY_VERSION) {
-      db.exec(`ALTER TABLE steps ADD COLUMN mode TEXT NOT NULL DEFAULT '${m.mode}'; PRAGMA user_version=${VERSION};`);
+      db.exec(`ALTER TABLE steps ADD COLUMN mode TEXT NOT NULL DEFAULT '${m.mode}';`);
+    }
+    if (p.mode === 'mixed' && m.version < MIXED_VERSION) {
+      db.exec(`PRAGMA user_version=${MIXED_VERSION};`);
+    } else if (p.mode !== m.mode && m.version === LEGACY_VERSION) {
+      db.exec(`PRAGMA user_version=${PER_STEP_VERSION};`);
     }
     const limits = settings(options.historyLimit, options.maxBytes, m);
     if (m.nextId >= Number.MAX_SAFE_INTEGER - 1 || m.revision >= Number.MAX_SAFE_INTEGER - 2) fail('revision/step id exhausted');

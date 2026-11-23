@@ -356,12 +356,13 @@ function encodePNG(width, height, rgb, channels = 3) {
  * @returns {{png: Buffer, width: number, height: number, surface: string, grain: number}}
  */
 function renderPNG(built, opts) {
-  const clampDim = v => Math.max(320, Math.min(1800, Math.round(v)));
+  const clampDim = v => Math.max(320, Math.min(CORE.MAX_CANVAS_SIDE, Math.round(v)));
   const oil = built.brush === 'oil' || built.brush === 'oilknife';
   if ((opts.paintState != null || opts.captureState) && !oil) throw new Error('Paint state requires oil or oilknife');
   if (opts.paintState != null && opts.baseImage) throw new Error('paintState cannot be combined with a base image');
-  // A restored state belongs to the caller: never consume/mutate its arrays.
-  const restored = opts.paintState == null ? null : PAINT_STATE.clonePaintState(opts.paintState);
+  // Preserve caller-owned snapshots by default. The project bridge may transfer ownership.
+  let restored = opts.paintState;
+  if (restored && !opts.consumePaintState) restored = PAINT_STATE.clonePaintState(restored);
   const meta = restored && restored.metadata;
   const base = opts.baseImage || (restored && restored.baseRGBA ? { width: meta.width, height: meta.height, rgba: restored.baseRGBA } : null);
   const hasSize = opts.width != null || opts.height != null || opts.size != null;
@@ -370,15 +371,15 @@ function renderPNG(built, opts) {
   const surface = opts.surface || (meta && meta.surface) || built.surface || 'warm';
   const seed = opts.seed == null && meta ? meta.seed : (opts.seed || 1);
   const grain = opts.grain == null ? (meta ? meta.grain : built.grain == null ? 0.46 : built.grain) : opts.grain;
-  if (meta && (width !== meta.width || height !== meta.height || built.brush !== meta.brush ||
+  if (meta && (width !== meta.width || height !== meta.height ||
       surface !== meta.surface || seed !== meta.seed || grain !== meta.grain ||
       (hasSize && ((opts.width != null && opts.width !== meta.width) ||
        (opts.height != null && opts.height !== meta.height) ||
        (opts.size != null && (opts.size !== meta.width || opts.size !== meta.height)))))) {
-    throw new Error('Paint state dimensions/brush/surface/seed/grain mismatch');
+    throw new Error('Paint state dimensions/surface/seed/grain mismatch');
   }
   if (base && (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 ||
-      width > 1800 || height > 1800 || !(base.rgba instanceof Uint8Array) || base.rgba.length !== width * height * 4)) {
+      width > CORE.MAX_CANVAS_SIDE || height > CORE.MAX_CANVAS_SIDE || !(base.rgba instanceof Uint8Array) || base.rgba.length !== width * height * 4)) {
     throw new Error('Invalid base image dimensions or RGBA buffer');
   }
   const ss = 2;
@@ -389,10 +390,11 @@ function renderPNG(built, opts) {
     surface,
     seed: seed ^ 0x1b873593
   }) : null;
+  let filmRelief = opts.fixedPaintRelief && oilState?.painted ? oilState.impasto : undefined;
   let lastOilGroup = -1;
   for (const primitive of built.primitives) {
     if (oil && primitive.kind === 'stroke' && primitive.group != null && primitive.brush === built.brush) {
-      if (primitive.group === lastOilGroup) continue;
+      if (primitive.group === lastOilGroup || (opts.fixedPaintRelief && primitive.flow === 0)) continue;
       lastOilGroup = primitive.group;
       OIL.paintOilStroke(ink, W, H, ss, primitive, {
         knife: built.brush === 'oilknife',
@@ -401,12 +403,20 @@ function renderPNG(built, opts) {
         load: opts.load == null ? 0.65 : opts.load,
         seed
       }, oilState);
+      if (opts.fixedPaintRelief && oilState.painted) {
+        // New paint uses the selected thickness; keep lighting of the retained film stable.
+        filmRelief ??= oilState.impasto;
+        oilState.impasto = filmRelief;
+      }
       continue;
     }
     // anything that is not a paint stroke is a wash, a charge or a mark that
     // belongs under the paint now on the board: resolve the film first so the
     // oil keeps its place in the drawing order
-    if (oilState && oilState.painted) OIL.flushOil(ink, W, H, ss, oilState);
+    if (oilState && oilState.painted) {
+      OIL.flushOil(ink, W, H, ss, oilState);
+      filmRelief = undefined;
+    }
     const poly = primitive.kind === 'stroke' ? primitive.outline : primitive.polygon;
     if (poly && poly.length >= 3) {
       const scaled = new Array(poly.length);
@@ -420,14 +430,17 @@ function renderPNG(built, opts) {
     // Capture *before* the final presentation-only flush: flushing clears the
     // wet film and updates dry pickup, so capturing afterwards breaks split
     // stroke equivalence. The normal non-capturing path does no copying.
-    paintState = PAINT_STATE.clonePaintState({
+    const snapshot = {
       version: 1,
       metadata: { width, height, ss, brush: built.brush, surface, seed, grain,
         itemOffset: opts.itemOffset == null ? (meta ? meta.itemOffset : 0) : opts.itemOffset,
         settings: opts.settings === undefined ? (meta ? meta.settings : null) : opts.settings },
       ink, paper, baseRGBA: base ? base.rgba : null,
       oil: { ...oilState, capA: oilState.capA || null, capB: oilState.capB || null }
-    });
+    };
+    // A synchronous writer may serialize the live buffers before preview composition.
+    if (typeof opts.captureState === 'function') opts.captureState(snapshot);
+    else paintState = PAINT_STATE.clonePaintState(snapshot);
   }
   if (oilState) OIL.flushOil(ink, W, H, ss, oilState);
   const rgb = composite(width, height, ink, ss, paper, seed, grain, base && base.rgba);

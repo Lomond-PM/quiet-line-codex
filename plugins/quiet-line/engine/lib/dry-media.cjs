@@ -15,7 +15,7 @@ function hash(x, y, seed) {
   h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 function createState(style, opts) {
-  const width = range(opts.width, 1, 1800, 'width', true), height = range(opts.height, 1, 1800, 'height', true), n = width * height;
+  const width = range(opts.width, 1, CORE.MAX_CANVAS_SIDE, 'width', true), height = range(opts.height, 1, CORE.MAX_CANVAS_SIDE, 'height', true), n = width * height;
   const seed = range(num(style.seed, 241), 1, 9999, 'seed', true), surface = style.surface || 'warm';
   if (!Object.hasOwn(CORE.SURFACES, surface)) throw new Error('Invalid dry surface');
   const settings = { weight: num(style.weight, 3), wobble: num(style.wobble, .58), pressure: num(style.pressure, .66), texture: num(style.texture, .46), accent: style.accent || null, brush: style.brush || 'pencil', ...opts.settings };

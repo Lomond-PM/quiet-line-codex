@@ -1,14 +1,14 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "quiet-line",
-  "version": "1.4.1",
-  "description": "Draw with ink, dry graphite, charcoal and wet oils. Save, revise and export Quiet Line painting projects.",
+  "version": "1.5.0",
+  "description": "Simulate traditional drawing and painting materials, including ink, erasable graphite and charcoal, and wet oils with pigment pickup, relief and drying.",
   "extensions": {
     "com.openai": {
       "requires_local_executor": true,
       "interface": {
         "displayName": "Quiet Line",
-        "shortDescription": "Draw and revise with pencils, ink and oil paint.",
+        "shortDescription": "Draw with simulated ink, graphite and oil paint.",
         "developerName": "Lomond-PM",
         "category": "Design",
         "websiteURL": "https://github.com/Lomond-PM/quiet-line-board",

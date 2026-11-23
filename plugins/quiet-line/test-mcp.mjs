@@ -52,16 +52,20 @@ test('Quiet Line over MCP', async t => {
   assert.deepEqual(await readFile(exported.target), original);
 
   const next = await draw({
-    project, project_material: 'dry', output: 'dry.png', preview: false,
+    project, output: 'dry.png', preview: false,
     operations: [
       { tool: 'charcoal', points: [[0.2, 0.18], [0.74, 0.23]], width: 2 },
       { tool: 'kneaded', points: [[0.42, 0.18], [0.48, 0.23]], width: 0.5 }
     ]
   });
-  assert.equal(success(next).projectMode, 'dry');
+  assert.equal(success(next).projectMode, 'mixed');
   assert.ok(next.content.every(block => block.type === 'text'));
   assert.equal(success(await manage({ action: 'list' })).steps.length, 3);
   assert.equal(success(await manage({ action: 'restore', step: 1 })).head, 1);
+  const wide = success(await draw({
+    project: 'wide.qlproject', width: 2560, height: 320, output: 'wide.png', preview: false
+  }));
+  assert.deepEqual([wide.width, wide.height, wide.marks], [2560, 320, 0]);
 
   const collision = await draw({ subject: 'cup', size: 320, output: 'wet.png' });
   assert.equal(collision.isError, true);

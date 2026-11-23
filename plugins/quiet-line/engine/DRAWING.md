@@ -98,7 +98,7 @@ Wet overlap picks up and mixes pigment: use it to connect related colours, but a
 
 流程只是脚手架：可合并、跳过、调整顺序、回头改构图，也可直接画法或使用更适合题材的方法。不是每张图都必须有底稿、必须分六轮，或必须先完成一张素描。不要把遵守工序当作画面已经成立。
 
-同一工程用 `project_material:"dry"` 与 `project_material:"wet"` 显式切换材料；同模式续画保留原模拟状态，跨模式把当前图像固定成下一阶段底图。固定后的旧炭笔不能在新湿画阶段直接擦除；可恢复或分支到历史干画步骤重新调整。重要切换前保存命名检查点。详见[工程指南](PROJECTS.md)。
+同一工程通过 `brush` 选择下一轮笔刷，通过 `operations` 擦除、擦揉或添加干性材料。已有干性笔迹和油彩状态会保留，便于后续回到原材料继续画。需要保存画面某个重要版本时，可设命名检查点。详见[工程指南](PROJECTS.md)。
 
 **English**
 
@@ -106,7 +106,7 @@ One useful scaffold is composition/perspective → light construction or tonal u
 
 Combine, skip, reorder or revisit stages; direct painting or another method may suit the subject better. Neither a separate drawing nor six tool calls is compulsory. Ritual completion is not visual success.
 
-Use `project_material:"dry"` / `project_material:"wet"` to explicitly change a project's active medium. Same-mode continuation keeps its simulation; a switch fixes the current image as the next phase's base. Old charcoal is not directly erasable in the new oil phase; restore or branch to its retained dry step to revise it. Name important checkpoints before switching. See the [project guide](PROJECTS.md).
+Select the brush for the next pass with `brush`. Use `operations` to erase, smudge, or add dry pigment. Existing oil and dry pigment remain available across brush changes. Pin a checkpoint when you want to retain a version of the complete painting. See the [project guide](PROJECTS.md).
 
 ## 5. 看结果，再有目的地继续 / Inspect, decide, continue
 

@@ -34,7 +34,7 @@ Install the repository directory or release tgz via DSH **Plugins → Add plugin
 
 Pass `base_image` (a local PNG, JPEG or static WebP path) and draw only the new
 marks. Dimensions default to the oriented original, reduced proportionally only
-above 1800px. Old pixels do not receive a new paper/grain layer. PNG alpha is
+above 2560px. Old pixels do not receive a new paper/grain layer. PNG alpha is
 preserved. Continuations always save a NEW file: an occupied explicit output is
 rejected, and default names gain numeric suffixes. No built-in study is added
 implicitly when a base image is supplied. See `CONTINUATION.md` for examples,
@@ -152,7 +152,7 @@ in roughly 0.5–0.8 s.
 
 ## Canvas size
 
-`width` and `height` are independent, 320–1800 px each. Use `size` as a square shorthand; `width` / `height` override it per axis. The shared core and the rasterizer both work in arbitrary aspect ratios, so a landscape or portrait drawing is a first-class board, not a cropped square.
+`width` and `height` are independent, 320–2560 px each. Use `size` as a square shorthand; `width` / `height` override it per axis. The shared core and the rasterizer both work in arbitrary aspect ratios, so a landscape or portrait drawing is a first-class board, not a cropped square.
 
 ```json
 { "width": 1600, "height": 1100 }
@@ -175,8 +175,8 @@ in roughly 0.5–0.8 s.
 - `brush` — `ink`, `fountain`, `pencil`, `charcoal`, `brush`, `marker`, `oil`, or `oilknife`; default `ink`.
 - `surface` — `warm`, `coldpress`, `kraft`, `linen`, `newsprint`, or `charcoal`; default `warm`.
 - `seed` — 1–9999, deterministic; the same seed redraws the same hand.
-- `size` — square shorthand, 320–1800; default 1200.
-- `width`, `height` — independent canvas dimensions, 320–1800 each; default to `size`.
+- `size` — square shorthand, 320–2560; default 1200.
+- `width`, `height` — independent canvas dimensions, 320–2560 each; default to `size`.
 - `wobble`, `pressure`, `grain` — 0–100.
 - `wetness` — how much wet paint the filaments lift, mix and drag, 0–100; default 55.
 - `impasto` — relief of the paint film: ridge light, groove shadow and glints, 0–100; default 62.
@@ -218,7 +218,7 @@ Custom fills are drawn first, then strokes, then dots, after any built-in subjec
 
 ## Behaviour and limits
 
-- Fresh canvases are opaque, 320–1800 px on each axis. base_image continuations preserve alpha and allow 1–1800 px. Wet snapshots preserve the original dimensions and base.
+- Fresh canvases are opaque, 320–2560 px on each axis. base_image continuations preserve alpha and allow 1–2560 px. Wet snapshots preserve the original dimensions and base.
 - No network access is used.
 - The procedural rasterizer and PNG encoder use Node built-ins; base-image decoding uses sharp. Wet snapshots use bounded zlib-compressed typed arrays.
 - When the image service is unavailable or the PNG exceeds its attachment limit, the file remains on disk and the tool result explains why no preview was attached.

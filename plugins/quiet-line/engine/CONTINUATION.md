@@ -50,12 +50,12 @@ It does not claim to infer a hidden scene or automatically erase an object.
   extension. Animated/multipage input is rejected. EXIF orientation is applied.
 - Maximum input is 32 MiB and 32 megapixels. Corrupt/unsupported inputs fail with
   an error rather than starting a blank drawing.
-- Output is PNG, at most 1800px per side. Default dimensions equal the oriented
-  original, scaled proportionally down only if its long side exceeds 1800px.
+- Output is PNG, at most 2560px per side. Default dimensions equal the oriented
+  original, scaled proportionally down only if its long side exceeds 2560px.
   Small inputs below 320px remain their original size.
 - One explicit width/height preserves aspect ratio; both explicit dimensions
   resize to that exact rectangle and can stretch the image. `size` is an
-  explicit square shorthand. Continuation dimensions must be integers 1–1800.
+  explicit square shorthand. Continuation dimensions must be integers 1–2560.
 - Inputs are decoded to 8-bit sRGB RGBA. Existing PNG transparency is retained.
   Non-sRGB profiles, high bit depth, EXIF orientation and optional resizing can
   transform decoded pixels; this is not a lossless metadata-preservation tool.

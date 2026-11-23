@@ -53,7 +53,11 @@ function sameSplit(brush, baseImage) {
   }
   assert.throws(() => renderPNG({ ...second, brush: 'ink' }, { paintState: loaded }), /oil/);
   assert.throws(() => renderPNG({ ...second, brush: 'ink' }, { captureState: true }), /oil/);
-  assert.throws(() => renderPNG({ ...second, brush: brush === 'oil' ? 'oilknife' : 'oil' }, { paintState: loaded }), /mismatch/);
+  const nextBrush = brush === 'oil' ? 'oilknife' : 'oil';
+  const switched = renderPNG({ ...noMarks, brush: nextBrush }, { paintState: loaded, captureState: true });
+  assert.deepEqual(switched.png, full.png, 'changing the active oil brush keeps existing paint visible');
+  assert.deepEqual(switched.paintState.oil, loaded.oil, 'changing the active oil brush keeps existing wet film');
+  assert.equal(switched.paintState.metadata.brush, nextBrush);
   count++;
   return { snapshot: b.paintState, file: output, built };
 }
@@ -86,7 +90,7 @@ try {
   assert.ok(stage.paintState.oil.dryA.some(x => x > 0));
   assert.deepEqual(renderPNG({ ...combined, primitives: combined.primitives.slice(cut) }, { ...opts, paintState: stage.paintState }).png, renderPNG(combined, opts).png);
   corrupt(file, h => { h.version = 9; });
-  corrupt(file, h => { h.metadata.width = 1801; });
+  corrupt(file, h => { h.metadata.width = CORE.MAX_CANVAS_SIDE + 1; });
   corrupt(file, h => { h.metadata.ss = 16; });
   corrupt(file, h => { h.metadata.seed = '271'; });
   corrupt(file, h => { h.metadata.itemOffset = -1; });

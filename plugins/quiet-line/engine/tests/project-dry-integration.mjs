@@ -15,24 +15,27 @@ const exec = { agent: { id: 'dry-paint-test' } };
 const draw = args => tools.get('quiet_line_draw').execute(args, exec);
 const manage = args => tools.get('quiet_line_project').execute(args, exec);
 const selected = (project, step) => readProject(cwd, project, { step, includeData: true });
-const snapshot = (bytes, name) => {
-  const p = path.join(cwd, name);
-  fs.writeFileSync(p, bytes, { flag: 'wx' });
-  return loadPaintState(cwd, p);
+const snapshot = async (project, target) => {
+  const exported = await manage({ action: 'export', project, target });
+  return loadPaintState(cwd, exported.target);
 };
 try {
   await draw({ project: 'oil.qlproject', brush: 'oil', size: 320, seed: 51, wetness: 100, project_checkpoint: 'before drying', strokes: [{ points: [[.2,.5],[.8,.5]], width: 8, color: '#1640a0' }], output: 'before.png' });
+  await draw({
+    project: 'oil.qlproject', brush: 'ink', project_checkpoint: 'ink beside wet oil',
+    strokes: [{ points: [[.2,.15],[.8,.15]], color: '#222222' }], output: 'ink-before-drying.png'
+  });
   const before = selected('oil.qlproject');
-  const wet = snapshot(before.selected.state, 'wet.qlpaint');
+  const wet = await snapshot('oil.qlproject', 'wet.qlpaint');
   assert(wet.oil.stamp.some(x => x !== 0), 'fixture must have wet pigment');
   await manage({ action: 'branch', project: 'oil.qlproject', target: 'still-wet.qlproject' });
   const result = await manage({ action: 'dry_paint', project: 'oil.qlproject' });
   assert.equal(result.head, before.head + 1);
   assert.equal(result.revision, before.revision + 1);
-  assert.equal(result.mode, 'wet');
+  assert.equal(result.mode, 'mixed');
   assert.match(tools.get('quiet_line_project').output.render({ action: 'dry_paint' }, result)[0].text, /explicitly dried/);
   const after = selected('oil.qlproject');
-  const dry = snapshot(after.selected.state, 'dried.qlpaint');
+  const dry = await snapshot('oil.qlproject', 'dried.qlpaint');
   assert.deepEqual(after.selected.png, before.selected.png, 'drying must keep the exact PNG');
   assert.deepEqual(after.selected.info, before.selected.info);
   assert(dry.oil.stamp.every(x => x === 0));
@@ -46,21 +49,21 @@ try {
   await assert.rejects(() => manage({ action: 'dry_paint', project: 'oil.qlproject', step: 1 }), /step is not used/);
   await assert.rejects(() => manage({ action: 'dry_paint', project: 'oil.qlproject', target: 'x.qlpaint' }), /target is only/);
   await assert.rejects(() => manage({ action: 'dry_paint', project: 'oil.qlproject', history_limit: 1 }), /only for prune/);
-  assert.throws(() => commitProject(cwd, 'oil.qlproject', { mode: 'wet', state: before.selected.state, png: before.selected.png, info: before.selected.info, expectedRevision: before.revision, historyLimit: before.historyLimit, maxBytes: before.maxBytes }), /stale or missing expectedRevision/);
+  assert.throws(() => commitProject(cwd, 'oil.qlproject', { mode: 'mixed', state: before.selected.state, png: before.selected.png, info: before.selected.info, expectedRevision: before.revision, historyLimit: before.historyLimit, maxBytes: before.maxBytes }), /stale or missing expectedRevision/);
   assert.equal(selected('oil.qlproject').revision, after.revision);
   const repeated = await manage({ action: 'dry_paint', project: 'oil.qlproject' });
   assert.equal(repeated.head, after.head + 1);
   assert.deepEqual(selected('oil.qlproject').selected.png, before.selected.png);
   const topStroke = { points: [[.3,.5],[.7,.5]], color: '#ffffff', width: 4 };
-  await draw({ project: 'oil.qlproject', wetness: 100, load: 100, strokes: [topStroke], output: 'on-dried.png' });
-  await draw({ project: 'still-wet.qlproject', wetness: 100, load: 100, strokes: [topStroke], output: 'on-wet.png' });
-  const dryTop = snapshot(selected('oil.qlproject').selected.state, 'on-dried.qlpaint');
-  const wetTop = snapshot(selected('still-wet.qlproject').selected.state, 'on-wet.qlpaint');
+  await draw({ project: 'oil.qlproject', brush: 'oilknife', wetness: 100, load: 100, strokes: [topStroke], output: 'on-dried.png' });
+  await draw({ project: 'still-wet.qlproject', brush: 'oilknife', wetness: 100, load: 100, strokes: [topStroke], output: 'on-wet.png' });
+  const dryTop = await snapshot('oil.qlproject', 'on-dried.qlpaint');
+  const wetTop = await snapshot('still-wet.qlproject', 'on-wet.qlpaint');
   assert.notDeepEqual(dryTop.oil.col, wetTop.oil.col, 'drying changes later wet pickup');
   assert(dryTop.oil.stamp.some(x => x !== 0), 'new paint remains wet after a dry layer');
   await draw({ project: 'dry.qlproject', dry_media: true, size: 320, operations: [{ tool: 'pencil', points: [[.2,.4],[.8,.4]] }], output: 'dry.png' });
   const dryBefore = selected('dry.qlproject');
-  await assert.rejects(() => manage({ action: 'dry_paint', project: 'dry.qlproject' }), /requires a wet oil project head/);
+  await assert.rejects(() => manage({ action: 'dry_paint', project: 'dry.qlproject' }), /oil/i);
   assert.equal(selected('dry.qlproject').revision, dryBefore.revision);
   const controller = new AbortController(); controller.abort();
   const beforeCancel = selected('oil.qlproject');
@@ -73,8 +76,8 @@ try {
   assert(!shortAfter.steps.some(s => s.id === shortBefore.head), 'unpinned old head can be pruned');
   await manage({ action: 'restore', project: 'oil.qlproject', step: before.head });
   assert.deepEqual(selected('oil.qlproject').selected.state, before.selected.state, 'restoring pinned wet step restores wetness');
-  const continuation = await draw({ project: 'oil.qlproject', strokes: [{ points: [[.3,.5],[.7,.5]], color: '#ffffff', width: 4 }], output: 'continued.png' });
-  assert.equal(continuation.projectMode, 'wet');
+  const continuation = await draw({ project: 'oil.qlproject', brush: 'oil', strokes: [{ points: [[.3,.5],[.7,.5]], color: '#ffffff', width: 4 }], output: 'continued.png' });
+  assert.equal(continuation.projectMode, 'mixed');
   console.log('project dry_paint integration passed');
 } finally {
   const resolved = fs.realpathSync(cwd);

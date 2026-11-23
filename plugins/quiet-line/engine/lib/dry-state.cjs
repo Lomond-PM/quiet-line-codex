@@ -6,7 +6,7 @@ const path = require('node:path');
 const zlib = require('node:zlib');
 const CORE = require('./core.cjs');
 const MAGIC = Buffer.from('QLDRY001');
-const MAX_BYTES = 52 * 1024 * 1024, MAX_HEADER = 16384;
+const MAX_BYTES = 104 * 1024 * 1024, MAX_HEADER = 16384;
 const TYPES = { u8: Uint8Array, f32: Float32Array };
 const littleEndian = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 const fail = m => { throw new Error(`Invalid dry state: ${m}`); };
@@ -22,7 +22,7 @@ function validateDryState(s, descriptors = false) {
   if (s.version !== 1) fail('version');
   const m = s.metadata;
   keys(m, ['width', 'height', 'surface', 'seed', 'grain', 'itemOffset', 'settings'], 'metadata');
-  number(m.width, 1, 1800, 'width', true); number(m.height, 1, 1800, 'height', true);
+  number(m.width, 1, CORE.MAX_CANVAS_SIDE, 'width', true); number(m.height, 1, CORE.MAX_CANVAS_SIDE, 'height', true);
   number(m.seed, 1, 9999, 'seed', true); number(m.grain, 0, 1, 'grain');
   number(m.itemOffset, 0, Number.MAX_SAFE_INTEGER, 'itemOffset', true);
   if (typeof m.surface !== 'string' || !Object.hasOwn(CORE.SURFACES, m.surface)) fail('surface');
@@ -82,7 +82,7 @@ function saveDryState(cwd, requested, s) {
   const compressed = zlib.deflateSync(raw);
   if (compressed.length > MAX_BYTES) fail('compressed size');
   // Do not concatenate another canvas-sized output buffer: state + raw +
-  // compressed are bounded below 192 MiB even for incompressible 1800² data.
+  // compressed can each be up to approximately 100 MiB at the largest size.
   const fd = fs.openSync(target, 'wx');
   try { fs.writeFileSync(fd, prefix); fs.writeFileSync(fd, json); fs.writeFileSync(fd, compressed); }
   finally { fs.closeSync(fd); }

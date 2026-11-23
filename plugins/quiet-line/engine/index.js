@@ -372,8 +372,8 @@ export function apply(ctx) {
       'For drawing revisions, normally use this tool on the previous image and show the painted result, rather than ' +
       'switching to generic image-processing scripts merely because an image already exists. Use other editing tools ' +
       'when the user explicitly requests image processing (such as crop/filter/colour adjustment) or this tool cannot perform the change. ' +
-      'Prefer project (.qlproject) for continued wet oil or dry-material work: one engineering file auto-saves editable state, PNG history and optional named checkpoints without loose snapshots. Continue with the same project; use quiet_line_project for history, restore, branch and export. Existing image pixels are a flattened dry layer. Legacy snapshots remain supported: save_state to a new .qlpaint file, then resume with paint_state (not base_image). Stroke controls enable per-point pressure/width/opacity/angle/tilt and oil tip/hardness/flow. State snapshots also allow branching from an earlier call; editable layers, masks and arbitrary per-stroke undo are not provided. ' +
-      'For material-aware graphite/charcoal, use dry_media with ordered operations: pencil, charcoal, eraser, kneaded and smudge. Save .qldry with save_dry_state, resume via dry_state; standalone dry/wet snapshots are independent. Projects can alternate media using explicit project_material switches, fixing the previous image as the next phase base while retaining earlier states in history; physical wet/dry mixing is not simulated. ' + ART_GUIDANCE,
+      'Use a project (.qlproject) to autosave a canvas, paint and undo history. A new project with no marks is blank. Choose any brush on each call. Oil, dry pigment and regular marks stay in the same project with their own painting behavior. Use quiet_line_project for history, restore, branch and export. Existing image pixels are a flattened dry layer. Legacy snapshots remain supported: save_state to a new .qlpaint file, then resume with paint_state (not base_image). Stroke controls enable per-point pressure/width/opacity/angle/tilt and oil tip/hardness/flow. State snapshots also allow branching from an earlier call; editable layers, masks and arbitrary per-stroke undo are not provided. ' +
+      'For material-aware graphite/charcoal, use dry_media with ordered operations: pencil, charcoal, eraser, kneaded and smudge. Save .qldry with save_dry_state, resume via dry_state; standalone dry/wet snapshots are independent. Projects retain separate oil and dry pigment states across brush changes. Different materials are composited without a physical interaction model between oil and dry pigment. ' + ART_GUIDANCE,
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -384,7 +384,7 @@ export function apply(ctx) {
         save_state: { type: 'string', description: 'Optional NEW .qlpaint path within working directory. Oil/oilknife only. Saves wet state for another call; never overwrites existing files. Saving is opt-in and has canvas-sized I/O cost. Keep previous snapshots for call-level rollback/branching.' },
         base_image: {
           type: 'string',
-          description: 'Optional existing local PNG, JPEG or static WebP path, absolute or relative to the session working directory. Draw ONLY the requested additions over it. Inherits its oriented dimensions, proportionally reduced only above 1800px; no new paper is applied to old pixels. Accepts up to 32 MiB / 32 megapixels. Existing paint is a dry flattened image, not recoverable wet layers. The source is never overwritten.'
+          description: 'Optional existing local PNG, JPEG or static WebP path, absolute or relative to the session working directory. Draw ONLY the requested additions over it. Inherits its oriented dimensions, proportionally reduced only above 2560px; no new paper is applied to old pixels. Accepts up to 32 MiB / 32 megapixels. Existing paint is a dry flattened image, not recoverable wet layers. The source is never overwritten.'
         },
         subject: {
           type: 'string',
@@ -411,15 +411,15 @@ export function apply(ctx) {
         },
         size: {
           type: 'integer',
-          description: 'Square shorthand for width and height, 320–1800 (1–1800 with base_image). Default 1200 for a new canvas; omit to inherit base image dimensions. Explicit square size may stretch the base. Ignored on an axis where width or height is given.'
+          description: 'Square shorthand for width and height, 320–2560 (1–2560 with base_image). Default 1200 for a new canvas; omit to inherit base image dimensions. Explicit square size may stretch the base. Ignored on an axis where width or height is given.'
         },
         width: {
           type: 'integer',
-          description: 'Canvas width, 320–1800 pixels (1–1800 with base_image). Omit to inherit the base width; with base_image and only this axis set, preserve aspect ratio. Setting both axes explicitly resizes the base to that exact size and may stretch it.'
+          description: 'Canvas width, 320–2560 pixels (1–2560 with base_image). Omit to inherit the base width; with base_image and only this axis set, preserve aspect ratio. Setting both axes explicitly resizes the base to that exact size and may stretch it.'
         },
         height: {
           type: 'integer',
-          description: 'Canvas height, 320–1800 pixels (1–1800 with base_image). Omit to inherit the base height; with base_image and only this axis set, preserve aspect ratio. Setting both axes explicitly resizes the base to that exact size and may stretch it.'
+          description: 'Canvas height, 320–2560 pixels (1–2560 with base_image). Omit to inherit the base height; with base_image and only this axis set, preserve aspect ratio. Setting both axes explicitly resizes the base to that exact size and may stretch it.'
         },
         wobble: {
           type: 'integer',
@@ -500,7 +500,7 @@ export function apply(ctx) {
           project: { type: 'string' },
           projectStep: { type: 'integer' },
           projectRevision: { type: 'integer' },
-          projectMode: { type: 'string', enum: ['wet', 'dry'] },
+          projectMode: { type: 'string', enum: ['wet', 'dry', 'mixed'] },
           projectTransition: { type: 'string' },
           image: IMAGE_SCHEMA,
           note: { type: 'string' }
@@ -515,9 +515,12 @@ export function apply(ctx) {
     },
     timeoutMs: 60000,
     isConcurrencySafe: () => false,
-    async execute(args, exec) {
+    async execute(args, exec, options = {}) {
       if (!exec.agent) fail('quiet_line_draw needs an owning Agent session');
-      if (args.project != null) return PROJECT_TOOL.executeProject(args, exec, { ctx, execute: (raw, run) => drawingTool.execute(raw, run) });
+      if (args.project != null) return PROJECT_TOOL.executeProject(args, exec, {
+        ctx, execute: (raw, run, opts) => drawingTool.execute(raw, run, opts),
+        outputPath, writeDrawing, attachImage
+      });
       PROJECT_TOOL.checkWithoutProject(args);
       if (args.dry_media != null && typeof args.dry_media !== 'boolean') fail('dry_media must be boolean');
       if (args.dry_media || args.operations != null || args.dry_state != null || args.save_dry_state != null) {
@@ -527,11 +530,12 @@ export function apply(ctx) {
       if (!cwd) fail('the session working directory is unavailable');
 
       const hasPaintState = args.paint_state != null;
-      if (hasPaintState && (args.base_image != null || args.subject != null)) fail('paint_state cannot be combined with base_image or subject');
+      if (hasPaintState && (args.base_image != null || (args.subject != null && !options.projectLayer))) fail('paint_state cannot be combined with base_image or subject');
       const paintState = hasPaintState ? await loadPaintState(cwd, args.paint_state) : undefined;
       const metadata = paintState?.metadata;
       if (metadata) {
-        for (const key of ['brush', 'surface', 'seed', 'width', 'height']) {
+        const keys = options.projectLayer ? ['surface', 'seed', 'width', 'height'] : ['brush', 'surface', 'seed', 'width', 'height'];
+        for (const key of keys) {
           if (args[key] != null && args[key] !== metadata[key]) fail(`paint_state fixes ${key}; omit it or use ${metadata[key]}`);
         }
         if (args.size != null && (args.size !== metadata.width || args.size !== metadata.height)) fail('paint_state dimensions cannot be resized');
@@ -568,9 +572,9 @@ export function apply(ctx) {
       if (!SURFACE_IDS.includes(surface)) fail(`surface must be one of ${SURFACE_IDS.join(', ')}`);
       const seed = integerIn(args.seed, metadata?.seed ?? 241, 1, 9999, 'seed');
       const baseImage = hasBaseImage ? await loadBaseImage(cwd, args.base_image, args) : undefined;
-      const size = hasBaseImage || hasPaintState ? undefined : integerIn(args.size, 1200, 320, 1800, 'size');
-      const width = metadata?.width ?? (baseImage ? baseImage.width : integerIn(args.width == null ? size : args.width, size, 320, 1800, 'width'));
-      const height = metadata?.height ?? (baseImage ? baseImage.height : integerIn(args.height == null ? size : args.height, size, 320, 1800, 'height'));
+      const size = hasBaseImage || hasPaintState ? undefined : integerIn(args.size, 1200, 320, CORE.MAX_CANVAS_SIDE, 'size');
+      const width = metadata?.width ?? (baseImage ? baseImage.width : integerIn(args.width == null ? size : args.width, size, 320, CORE.MAX_CANVAS_SIDE, 'width'));
+      const height = metadata?.height ?? (baseImage ? baseImage.height : integerIn(args.height == null ? size : args.height, size, 320, CORE.MAX_CANVAS_SIDE, 'height'));
       const previousSettings = metadata?.settings;
       const wetness = args.wetness == null ? (previousSettings?.wetness ?? 0.55) : numberIn(args.wetness, 55, 0, 100, 'wetness') / 100;
       const impasto = args.impasto == null ? (previousSettings?.impasto ?? 0.62) : numberIn(args.impasto, 62, 0, 100, 'impasto') / 100;
@@ -588,16 +592,27 @@ export function apply(ctx) {
         wobble: args.wobble == null ? (previousSettings?.wobble ?? 0.58) : numberIn(args.wobble, 58, 0, 100, 'wobble') / 100,
         pressure: args.pressure == null ? (previousSettings?.pressure ?? 0.66) : numberIn(args.pressure, 66, 0, 100, 'pressure') / 100,
         texture: args.grain == null ? (previousSettings?.texture ?? 0.46) : numberIn(args.grain, 46, 0, 100, 'grain') / 100,
-        itemOffset: metadata?.itemOffset || 0,
-        padding: 0.02,
+        itemOffset: options.itemOffset ?? metadata?.itemOffset ?? 0,
+        padding: options.projectLayer && !requestedSubject ? 0 : 0.02,
         brush,
         surface,
         ...(accent === undefined ? {} : { accent })
       };
+      options.observeOilSettings?.({
+        itemOffset: style.itemOffset, weight: style.weight, wobble: style.wobble * 100,
+        pressure: style.pressure * 100, grain: style.texture * 100, accent: style.accent,
+        wetness: wetness * 100, impasto: impasto * 100, load: load * 100
+      });
       const built = CORE.buildSketch(sketch, style, { width, height });
       const rendered = RASTER.renderPNG(built, {
         width, height, seed, grain: metadata?.grain ?? built.grain, surface, wetness, impasto, load, baseImage,
-        paintState, captureState: args.save_state != null, itemOffset: style.itemOffset + items.length,
+        paintState,
+        consumePaintState: options.projectLayer === true,
+        fixedPaintRelief: options.projectLayer === true,
+        captureState: args.save_state != null && (options.projectLayer
+          ? snapshot => savePaintState(cwd, args.save_state, snapshot)
+          : true),
+        itemOffset: style.itemOffset + items.length,
         settings: { weight: style.weight, wobble: style.wobble, pressure: style.pressure, texture: style.texture,
           wetness, impasto, load, accent: accent || null }
       });
@@ -607,10 +622,11 @@ export function apply(ctx) {
         explicitOutput: args.output != null && String(args.output).trim() !== ''
       });
 
-      const savedState = args.save_state != null ? await savePaintState(cwd, args.save_state, rendered.paintState) : undefined;
+      const savedState = args.save_state == null ? undefined : options.projectLayer
+        ? args.save_state : await savePaintState(cwd, args.save_state, rendered.paintState);
       const limits = ctx.get('attachments')?.imageLimits;
       let image, note;
-      if (limits) {
+      if (limits && !options.projectLayer) {
         const attached = await attachImage(ctx, rendered.png, path.basename(target), limits);
         image = attached.image;
         note = attached.note;

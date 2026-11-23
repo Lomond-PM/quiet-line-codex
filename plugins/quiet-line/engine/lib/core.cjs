@@ -1616,6 +1616,7 @@
 
   const api = {
     TAU,
+    MAX_CANVAS_SIDE: 2560,
     clamp,
     lerp,
     smoothstep,

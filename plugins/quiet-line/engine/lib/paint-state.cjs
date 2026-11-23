@@ -8,7 +8,7 @@ const zlib = require('node:zlib');
 const CORE = require('./core.cjs');
 const MAGIC = Buffer.from('QLPAINT1');
 const VERSION = 1;
-const MAX_BYTES = 192 * 1024 * 1024;
+const MAX_BYTES = 320 * 1024 * 1024;
 const MAX_HEADER = 16384;
 const TYPES = { u8: Uint8Array, u16: Uint16Array, f32: Float32Array };
 const littleEndian = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
@@ -33,7 +33,7 @@ function validate(snapshot, descriptors = false) {
   if (snapshot.version !== VERSION) fail('unsupported version');
   const m = snapshot.metadata;
   keys(m, ['width', 'height', 'ss', 'brush', 'surface', 'seed', 'grain', 'itemOffset', 'settings'], 'metadata');
-  number(m.width, 1, 1800, 'width', true); number(m.height, 1, 1800, 'height', true);
+  number(m.width, 1, CORE.MAX_CANVAS_SIDE, 'width', true); number(m.height, 1, CORE.MAX_CANVAS_SIDE, 'height', true);
   if (m.ss !== 2) fail('supersampling');
   if (m.brush !== 'oil' && m.brush !== 'oilknife') fail('brush must be oil or oilknife');
   if (typeof m.surface !== 'string' || !Object.hasOwn(CORE.SURFACES, m.surface)) fail('surface');
@@ -127,7 +127,12 @@ function savePaintState(cwd, requestedPath, snapshot) {
   const prefix = Buffer.alloc(12); MAGIC.copy(prefix); prefix.writeUInt32LE(json.length, 8);
   const compressed = zlib.deflateSync(Buffer.concat(chunks));
   const target = outputPath(cwd, requestedPath);
-  fs.writeFileSync(target, Buffer.concat([prefix, json, compressed]), { flag: 'wx' });
+  const fd = fs.openSync(target, 'wx');
+  try {
+    fs.writeFileSync(fd, prefix);
+    fs.writeFileSync(fd, json);
+    fs.writeFileSync(fd, compressed);
+  } finally { fs.closeSync(fd); }
   return target;
 }
 function loadPaintState(cwd, requestedPath) {
@@ -137,7 +142,7 @@ function loadPaintState(cwd, requestedPath) {
   let bytes;
   try {
     const stat = fs.fstatSync(fd);
-    if (!stat.isFile() || stat.size < 14 || stat.size > MAX_BYTES + MAX_HEADER) fail('file size');
+    if (!stat.isFile() || stat.size < 14 || stat.size > MAX_BYTES + MAX_HEADER + 12) fail('file size');
     bytes = Buffer.alloc(stat.size);
     let read = 0;
     while (read < bytes.length) {

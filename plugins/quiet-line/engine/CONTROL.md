@@ -75,7 +75,7 @@ stroke 可增加 `tip:"round"|"flat"`、`aspect:0.05..1`（默认0.3）、`angle
 
 - 恢复原始纸底/透明底、premultiplied ink、湿颜料颜色、覆盖、厚度、干燥序号、干层拾色缓冲、纸齿、笔画随机种子偏移；不会把上一张 PNG 再叠一遍。
 - 尺寸、brush、surface、seed、grain 固定并继承；不允许恢复时调整这些属性。weight/wobble/pressure/原始texture/wetness/impasto/load/accent 也被保存为续画默认值，可调整其中非固定属性。
-- 文件为带版本、严格校验的压缩二进制快照，不包含可执行对象。上限每轴1800像素，状态文件与解压数据上限192 MiB。大画布会有较高瞬时内存需求。
+- 文件为带版本、严格校验的压缩二进制快照，不包含可执行对象。上限每轴 2560 像素，状态数据上限 320 MiB。大画布会有较高瞬时内存需求。
 - 输出在当前工作目录内，父目录需已存在；状态文件不覆盖旧文件。PNG 续画也另存。保存失败时已生成的 PNG 可能仍存在，可换一个状态文件名重试。
 - `base_image` 仍用于在普通 PNG/JPEG/WebP 上干叠画；可在此基础上首次 save_state，但无法从原图逆向恢复旧湿料。
 - 不能把 paint_state 与 base_image 或 subject 同时提供。只恢复、不加 marks 可以导出该节点的 PNG。
