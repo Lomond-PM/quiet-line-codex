@@ -15,7 +15,7 @@ const a={tool:'charcoal',points:[[.2,.48],[.8,.5]],width:8,pressure:.6,tilt:.7,g
 const b={tool:'smudge',points:[[.3,.49],[.7,.55]],width:10,pressure:.6};
 const c={tool:'kneaded',points:[[.3,.45],[.6,.45]],width:5,pressure:.8};
 const opts={size:320,seed:623,grain:36,surface:'kraft',weight:4,wobble:20,pressure:40};
-assert.match(tool.description,/overworking/i);
+assert.match(tool.description,/dry_media with ordered operations/);
 assert.ok(tool.parameters.properties.operations);
 const first=await run({...opts,operations:[a],save_dry_state:'first.qldry',output:'first.png'});
 assert.equal(first.dryMedia,true); assert.equal(first.paintState,undefined);

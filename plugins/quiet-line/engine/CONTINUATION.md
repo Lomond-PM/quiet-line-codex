@@ -1,15 +1,10 @@
 # Continue painting — 1.0.19
 
-## Model-facing guidance
+## Overpainting an existing image
 
-When a user requests a drawing iteration, normally continue painting with
-`quiet_line_draw` on the previous image and show the painted result. Do not
-switch to generic image-processing scripts merely because an image already
-exists. Use other editing tools when the user explicitly requests image
-processing (crop/filter/colour adjustment, etc.) or this tool cannot perform
-the requested change. This guidance is in the registered tool description,
-its rendered result text and the localized plugin description, not a global
-instruction imposed on unrelated image work.
+`quiet_line_draw` accepts an existing image as a base for new marks. An
+editable Quiet Line project or material snapshot preserves simulated paint
+state across calls. Choose the workflow according to the requested change.
 
 ## Main flow
 
@@ -17,10 +12,11 @@ instruction imposed on unrelated image work.
 2. Set `base_image` to its local path. Absolute paths and paths relative to the
    session working directory are supported, including images outside that
    directory. Remote URLs and attachment identifiers are not local paths.
-3. Normally omit `subject`, `size`, `width` and `height`. Supply only the new
-   strokes/fills/dots, using normalized coordinates in the whole base image.
+3. Supply the new strokes, fills or dots using normalized coordinates. Omit
+   `subject` to skip a built-in study. Omit `size`, `width` and `height` to
+   inherit the image dimensions within the supported range.
 4. Use a new `output` name or omit it for an automatically unique default name.
-5. Show the result. Use that result as `base_image` for the next iteration.
+5. To add more marks to the resulting bitmap, pass its path as `base_image`.
 
 Example tool arguments:
 

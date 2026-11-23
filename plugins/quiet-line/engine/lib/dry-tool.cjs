@@ -6,7 +6,7 @@ const operationProperties = {
   tool: {type:'string',enum:TOOLS,description:'Material or operation, applied in array order. eraser removes material; kneaded gently lifts it; smudge moves loose material. They never edit the flattened base image.'},
   points: {type:'array',minItems:2,maxItems:400,items:{type:'array',items:{type:'number'},minItems:2,maxItems:2},description:'Normalized canvas coordinates, y down, -0.2..1.2. Two or more path anchors.'},
   color: {type:'string',description:'Pigment colour: palette name or #rrggbb. Default ink. Only pencil/charcoal deposit colour.'},
-  width: {type:'number',minimum:0.1,maximum:30,description:'Contact width multiplier of base weight, 0.1–30; default 1, NOT pixels. Nominal pixels = weight × (short canvas side / 420)^0.68 × width; tilt, tip and controls change the footprint. Use wider values and tilt for broad shading or erasing.'},
+  width: {type:'number',minimum:0.1,maximum:30,description:'Contact width multiplier of base weight, 0.1–30; default 1, NOT pixels. Nominal pixels = weight × (short canvas side / 420)^0.68 × width; tilt, tip and controls change the footprint.'},
   pressure: {type:'number',minimum:0,maximum:1,description:'Actual contact pressure (default 0.5), affecting material density; 0 deposits/removes/moves nothing. Unlike the global pressure-variation setting.'},
   opacity: {type:'number',minimum:0,maximum:1,description:'Operation strength, default 0.95.'},
   flow: {type:'number',minimum:0,maximum:1,description:'Material transfer rate, default 1.'},

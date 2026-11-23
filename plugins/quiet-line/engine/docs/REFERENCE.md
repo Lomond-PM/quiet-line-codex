@@ -40,11 +40,9 @@ rejected, and default names gain numeric suffixes. No built-in study is added
 implicitly when a base image is supplied. See `CONTINUATION.md` for examples,
 limits and iteration guidance. Fresh-canvas output remains byte-identical to 1.0.18.
 
-For drawing iterations, normally continue using this tool and show the painted
-result rather than switching to generic image-processing scripts merely because
-a finished image exists. Explicit crop/filter/colour-adjustment requests or a
-change this tool cannot perform can use other tools. Existing images are dry,
-flattened pixels, not recovered wet pigment, height maps or editable layers.
+A base image supplies flattened pixels for overpainting. A .qlproject or
+material snapshot preserves the wet pigment or dry material needed for
+material-aware continuation. Choose the approach that fits the requested edit.
 
 ## 1.0.18 — coherent paint-volume lighting
 

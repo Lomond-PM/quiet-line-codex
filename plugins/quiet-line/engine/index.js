@@ -69,7 +69,7 @@ const STROKE_SCHEMA = {
       description: 'Ordered points of the line. Two points make a straight stroke; more make a hand-drawn curve.'
     },
     color: { type: 'string', description: 'ink, accent, clay, ochre, sage, or a #rrggbb value. Default ink.' },
-    width: { type: 'number', minimum: 0.1, maximum: 30, description: 'Stroke width multiplier of base weight, 0.1–30 for every brush (including dry_media). Default 1; NOT pixels. Approximate nominal pixels = weight × (short canvas side / 420)^0.68 × width × brush scale; pressure, taper and tip also affect contact. For large solid areas prefer fills outside dry-media mode.' },
+    width: { type: 'number', minimum: 0.1, maximum: 30, description: 'Stroke width multiplier of base weight, 0.1–30 for every brush (including dry_media). Default 1; NOT pixels. Approximate nominal pixels = weight × (short canvas side / 420)^0.68 × width × brush scale; pressure, taper and tip also affect contact. Fills are available outside the dedicated dry-media pass.' },
     pressure: { type: 'number', minimum: 0, maximum: 1, description: 'Dry-media shorthand only: contact pressure affecting density, default 0.5. Requires dry_media:true; not the global pressure-variation setting.' },
     grade: { type: 'string', enum: ['H', 'HB', '2B', '4B', '6B', '8B'], description: 'Dry-media shorthand only: material softness, default 2B. Requires dry_media:true.' },
     opacity: { type: 'number', description: '0–1. Default 0.95.' },
@@ -163,7 +163,7 @@ function numberIn(value, fallback, min, max, label) {
     const widthHint = /^(strokes|operations)\[\d+\](?:\.controls\[\d+\])?\.width$/.test(label)
       ? label.includes('.controls[')
         ? '; controls.width is a local multiplier, not pixels. Use stroke/operation width (0.1–30) for the overall size'
-        : '; width is a multiplier of base weight, not pixels. Use 1 for normal contact, up to 30 for broad marks, or use fills for large solid areas outside dry-media mode'
+        : '; width is a multiplier of base weight, not pixels. The default multiplier is 1. Fills are available outside the dedicated dry-media pass'
       : '';
     fail(`${label} must be between ${min} and ${max}${widthHint}`);
   }
@@ -350,7 +350,7 @@ function renderValue(value) {
   }
   if (value.resumedState) lines.push(`Resumed wet paint: ${value.resumedState}`);
   if (value.paintState) lines.push(`Wet state: ${value.paintState}. Continue with paint_state set to this file, not base_image, to retain wet pickup and thickness.`);
-  else lines.push(`For a drawing revision, use base_image set to this result's path for dry overpainting. To preserve wet oil across future calls, request save_state while drawing. Do not switch to external image processing unless requested or necessary.`);
+  else lines.push(`This PNG can serve as base_image for overpainting. An optional save_state snapshot preserves wet oil across calls.`);
   if (value.note) lines.push(value.note);
   return lines.join('\n');
 }
@@ -362,12 +362,9 @@ export function apply(ctx) {
       'Draw a Quiet Line hand-drawn illustration on a chosen surface and attach it to the result. ' +
       'Pick a brush (ink, fountain, pencil, charcoal, brush, marker, oil, palette knife) and a canvas material ' +
       '(warm paper, cold-press, kraft, linen, newsprint, charcoal paper), then choose a built-in study or supply ' +
-      'custom strokes, filled washes and dots. All marks receive trajectory wobble, pressure variation, tapered ends ' +
-      'and optional hatching; oil and palette-knife strokes go through a wet paint simulation with paint pickup, ' +
+      'custom strokes, filled washes and dots. Drawing controls include trajectory wobble, pressure variation, tapered ends ' +
+      'and optional hatching. Oil and palette-knife strokes use a wet paint simulation with paint pickup, ' +
       'bristle ridges and impasto. Start fresh or paint new marks over an existing image. ' +
-      'For drawing revisions, normally use this tool on the previous image and show the painted result, rather than ' +
-      'switching to generic image-processing scripts merely because an image already exists. Use other editing tools ' +
-      'when the user explicitly requests image processing (such as crop/filter/colour adjustment) or this tool cannot perform the change. ' +
       'Use a project (.qlproject) to autosave a canvas, paint and undo history. A new project with no marks is blank. Choose any brush on each call. Oil, dry pigment and regular marks stay in the same project with their own painting behavior. Use quiet_line_project for history, restore, branch and export. Existing image pixels are a flattened dry layer. Legacy snapshots remain supported: save_state to a new .qlpaint file, then resume with paint_state (not base_image). Stroke controls enable per-point pressure/width/opacity/angle/tilt and oil tip/hardness/flow. State snapshots also allow branching from an earlier call; editable layers, masks and arbitrary per-stroke undo are not provided. ' +
       'For material-aware graphite/charcoal, use dry_media with ordered operations: pencil, charcoal, eraser, kneaded and smudge. Save .qldry with save_dry_state, resume via dry_state; standalone dry/wet snapshots are independent. Projects retain separate oil and dry pigment states across brush changes. Different materials are composited without a physical interaction model between oil and dry pigment. ' + ART_GUIDANCE,
     parameters: {
@@ -380,7 +377,7 @@ export function apply(ctx) {
         save_state: { type: 'string', description: 'Optional NEW .qlpaint path within working directory. Oil/oilknife only. Saves wet state for another call; never overwrites existing files. Saving is opt-in and has canvas-sized I/O cost. Keep previous snapshots for call-level rollback/branching.' },
         base_image: {
           type: 'string',
-          description: 'Optional existing local PNG, JPEG or static WebP path, absolute or relative to the session working directory. Draw ONLY the requested additions over it. Inherits its oriented dimensions, proportionally reduced only above 2560px; no new paper is applied to old pixels. Accepts up to 32 MiB / 32 megapixels. Existing paint is a dry flattened image, not recoverable wet layers. The source is never overwritten.'
+          description: 'Optional existing local PNG, JPEG or static WebP path, absolute or relative to the session working directory. Composites new marks over this image. Inherits its oriented dimensions, proportionally reduced only above 2560px; no new paper is applied to old pixels. Accepts up to 32 MiB / 32 megapixels. Existing paint is a dry flattened image, not recoverable wet layers. The source is never overwritten.'
         },
         subject: {
           type: 'string',

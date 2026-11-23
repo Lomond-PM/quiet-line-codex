@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import sharp from 'sharp';
+import guidance from './engine/lib/art-guidance.cjs';
 
 test('Quiet Line over MCP', async t => {
   const workspace = await mkdtemp(path.join(os.tmpdir(), 'quiet-line-mcp-'));
@@ -23,6 +24,8 @@ test('Quiet Line over MCP', async t => {
   const { tools } = await client.listTools();
   assert.deepEqual(tools.map(tool => tool.name), ['quiet_line_draw', 'quiet_line_project']);
   assert.ok(tools.every(tool => tool.inputSchema.required.includes('workspace')));
+  assert.ok(tools[0].description.endsWith(guidance.ART_GUIDANCE));
+  assert.match(tools[0].description, /Choose stroke scale and density according to artistic intent\./);
 
   const invoke = (name, args) => client.callTool({ name, arguments: { workspace, ...args } });
   const draw = args => invoke('quiet_line_draw', args);

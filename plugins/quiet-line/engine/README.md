@@ -50,15 +50,15 @@ Quiet Line 是给 DSH 里的 AI 用的画板，主要模拟真实绘画材料的
 
 想控制得更细，也能告诉它哪里按重一点、哪里提笔，如何转动油画扁平刷，以及颜料要湿一些还是干一些。一般使用不需要记住这些参数；需要时再看[笔触与湿画指南](CONTROL.md)。
 
-## 1.4.1：让油彩先干化，再继续画
+## 显式干化油彩
 
 有油彩的工程可以显式“干化当前油彩”。干化立即生效并新增一个工程步骤，保留画面、颜色和厚度。之后添画时，已干油彩不会参与湿拾色。如需长期保留干化前的湿状态，可设置命名检查点或另存分支。详见[工程指南](PROJECTS.md)。
 
 ## 在一幅画里交替用笔
 
-可从空白工程开始，先用炭笔起型，再用油画笔和调色刀薄涂，随后换成毛刷或马克笔加细节。各材料的状态随工程保存，返回炭笔时仍可擦揉已有炭粉，返回油彩时已有湿颜料仍可拾色。详见[工程指南](PROJECTS.md)。
+空白工程里可以按画面需要换笔。例如可以用炭笔起型，再用油画笔、调色刀或马克笔添画。各材料的状态随工程保存，返回炭笔时仍可擦揉已有炭粉，返回油彩时已有湿颜料仍可拾色。详见[工程指南](PROJECTS.md)。
 
-所有画笔的整体笔宽倍率放宽为 **0.1..30**，逐点局部倍率仍为 **0..3**，不是像素值。内置指导强化构图、透视、漫反射／高光与明暗结构，鼓励灵活借鉴真实作画阶段；必要时可用参考图或三辅二辅助，不强制固定流程。薄涂用低不透明度、低负载颜料作视觉近似。详见[绘画方法](DRAWING.md)与[笔触说明](CONTROL.md)。
+所有画笔的整体笔宽倍率放宽为 **0.1..30**，逐点局部倍率仍为 **0..3**，不是像素值。绘画指南介绍构图、透视、光照和明暗组织，也包括可选的参考图与三辅二方法。薄涂用低不透明度、低负载颜料作视觉近似。详见[绘画方法](DRAWING.md)与[笔触说明](CONTROL.md)。
 
 ## 一幅画，一个工程
 
@@ -72,11 +72,11 @@ Quiet Line 是给 DSH 里的 AI 用的画板，主要模拟真实绘画材料的
 
 1.2.0 新增独立的 **干性材料模式**：石墨与炭粉可以逐次沉积，用侧锋铺大灰面，再用普通橡皮、可塑橡皮提亮，或用纸擦笔沿形带开浮粉。同一次调用中可以按顺序换工具；保存 `.qldry` 状态后，下次继续擦、揉和添画。
 
-> 用新的干性材料模式画一只梨。先定左上光，用铅笔侧锋铺三组明暗，再用炭条压实接触暗部，用可塑橡皮提出一处高光。看一次结果，再有目的地修正比例和边缘；最多三轮。
+> 用新的干性材料模式画一只梨。先定左上光，用铅笔侧锋铺三组明暗，再用炭条压实接触暗部，用可塑橡皮提出一处高光。看一下结果，按画面需要修正比例和边缘。
 
 这是显式开启的 `dry_media:true` 新路径，原有铅笔／炭条风格化笔触保持不变。已有图片是受保护的底图：只能擦揉这次新加的材料，不能反向恢复或擦除原图中已经展平的老笔迹。详见[干性材料指南](DRY-MEDIA.md)。
 
-工具描述也内置了简短绘画指导：先构图与明暗，再处理体积、边缘和细节；查看输出后有目的地继续，不必因为担心“画过头”就过早停笔，但应遵守用户的轮数、时间和费用限制。详细方法与练习见[绘画指南](DRAWING.md)。
+笔触尺度、密度和修改方式由画面目标决定。可以按创作意图参考[绘画指南](DRAWING.md)中的方法和练习。
 
 ## 安装到 DSH
 
@@ -98,9 +98,9 @@ Quiet Line 是给 AI 使用的轻量画具，不是 Photoshop，也不是完整�
 
 ---
 
-## Dry oil before continuing
+## Explicit oil drying
 
-In a project containing oils, ask the AI to dry the current oil paint before adding more marks. Drying takes effect immediately and records a new step. It preserves the artwork, colour and relief, and subsequent strokes skip wet pickup from the dried paint. Pin a checkpoint or branch to keep a recoverable wet state. See [projects](PROJECTS.md).
+In a project containing oils, the dry_paint action dries the current oil immediately and records a new step. It preserves the artwork, colour and relief, and subsequent strokes skip wet pickup from the dried paint. Pin a checkpoint or branch to keep a recoverable wet state. See [projects](PROJECTS.md).
 
 ## Let your AI draw something for you
 
@@ -132,9 +132,9 @@ For more deliberate marks, the tool offers per-point pressure, width and opacity
 
 ### Use different tools on one canvas
 
-Start with a blank project, sketch in charcoal, lay in oils with a brush and palette knife, then add details in ink or marker. The project keeps each material state across brush changes. When you return to charcoal, earlier dry pigment can still be smudged. When you return to oil, the earlier wet oil remains available for pickup. See the [project guide](PROJECTS.md).
+A blank project accepts brushes in any order. For example, a drawing could combine charcoal construction, oil passages, and ink or marker. The project keeps each material state across brush changes. When you return to charcoal, earlier dry pigment can still be smudged. When you return to oil, the earlier wet oil remains available for pickup. See the [project guide](PROJECTS.md).
 
-Overall stroke width now accepts **0.1..30** for all brushes; per-point width stays **0..3**. These are multipliers, not pixels. Built-in guidance emphasizes composition, perspective, diffuse/specular light and value structure, with adaptable painting stages and optional references/3D-to-2D aids. Low-opacity, low-load paint visually approximates thin washes, not solvent chemistry. See [drawing practice](DRAWING.md) and [controls](CONTROL.md).
+Overall stroke width now accepts **0.1..30** for all brushes; per-point width stays **0..3**. These are multipliers, not pixels. The drawing guide covers approaches to composition, perspective, light and value structure, along with optional references and 3D-to-2D aids. Low-opacity, low-load paint visually approximates thin washes, not solvent chemistry. See [drawing practice](DRAWING.md) and [controls](CONTROL.md).
 
 ### One painting, one project
 
@@ -148,11 +148,11 @@ Logical capacity defaults to **2 GiB**. Old unpinned history is pruned first, ne
 
 Version 1.2.0 adds an opt-in **dry-media workflow**: layer graphite or charcoal, shade with side contact, lift highlights with regular or kneaded erasers, and move loose powder with a directional smudge tool. Switch tools in order within one call, then save a `.qldry` snapshot for further drawing, lifting and blending later.
 
-> Use the new dry-media mode to draw a pear with upper-left light. Block three values with pencil side strokes, deepen the contact shadow in charcoal, and lift one highlight with a kneaded eraser. Inspect the result and revise proportions and edges purposefully; use at most three passes.
+> Use the new dry-media mode to draw a pear with upper-left light. Block three values with pencil side strokes, deepen the contact shadow in charcoal, and lift one highlight with a kneaded eraser. Inspect the result and revise the proportions and edges as the drawing needs.
 
 Enable it explicitly with `dry_media:true`; existing stylized pencil/charcoal strokes stay unchanged. An existing image remains protected substrate: you can erase or smudge newly deposited material, not recover or remove the old flattened strokes inside the image. See the [dry-media guide](DRY-MEDIA.md).
 
-The tool description also includes compact craft guidance: composition and values before detail, volume and varied edges, then inspect and revise. It encourages useful additional passes rather than stopping prematurely from fear of overworking, while respecting the user's pass, time and cost limits. See the bilingual [drawing guide](DRAWING.md) for methods and exercises.
+The artwork's intent guides stroke scale, density and revisions. The bilingual [drawing guide](DRAWING.md) offers optional methods and exercises.
 
 ### Install
 

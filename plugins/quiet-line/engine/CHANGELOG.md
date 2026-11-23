@@ -1,5 +1,12 @@
 # Changelog / 更新记录
 
+## 1.5.2 — 2026-11-23
+
+- 笔触尺度与密度由视觉目标决定。工具和指南将阶段顺序、笔触手法和修改轮次表述为可选方法，并保留实际参数限制。
+- 在维护规范中要求，将模型可见 Prompt 的修改单独列出交由用户决定。
+- Let artistic intent determine stroke scale and density. Describe techniques as options and reserve parameter restrictions for tool behavior.
+- Require a separate user review for model-visible prompt changes in the maintenance policy.
+
 ## 1.5.1 — 2026-11-23
 
 - 修复 DSH 工程已保存但绘画工具报 `not lossless JSON` 的问题。成功返回预览时省略空提示，预览不可用时仍返回 PNG 路径和说明。

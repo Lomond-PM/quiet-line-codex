@@ -2,77 +2,75 @@
 
 [README](README.md) · [干性材料 / Dry media](DRY-MEDIA.md) · [旧笔触与湿画 / Legacy strokes and wet painting](CONTROL.md)
 
-工具负责落笔，模型负责观察、取舍与构图。这份指南是工作方法，不是要求每张图套用一种画风；用户的题材、审美、时间与费用限制始终优先。简短英文指导由 [art-guidance.cjs](lib/art-guidance.cjs) 导出，供工具描述使用；这里展开说明。
+工具负责落笔，模型负责观察、取舍与构图。以下技巧与练习可按创作意图和用户要求取用，也可尝试其他画法。
 
-The renderer makes marks; the model makes visual decisions. These are working methods, not a mandatory style. The user's subject, taste, time and cost limits take precedence. A short English version is exported by [art-guidance.cjs](lib/art-guidance.cjs) for the tool description; this document provides the fuller practice guide.
+The renderer makes marks and the model makes visual decisions. Choose among the techniques and exercises below according to the artistic intent and the user's requirements.
 
-## 1. 先安排画面 / Compose before detailing
+**让视觉目标决定笔触尺度与密度。**
+
+Choose stroke scale and density according to artistic intent. Use broad strokes for large masses and smaller, varied strokes wherever they improve form, texture, depth, or expression.
+
+## 1. 构图与细节 / Composition and detail
 
 **中文**
 
-- 先确定画幅、主体位置、观看方向和重心。用一两块大形概括，而不是从眼睛、树叶或杯沿开始。
+- 画幅、主体位置、观看方向和视觉重心可通过大形试排，也可以从眼睛、树叶或杯沿的局部出发，再向外发展画面。
 - 比较外接形的高宽、主要轴线、相邻形之间的距离；检查负形，例如手臂与躯干之间、树枝与天空之间的空隙。
-- 选一个视觉焦点。最高对比、最清晰的边缘和最密的细节不必遍布全图。
-- 对写生或参考图，先观察再落笔；对想象画，先决定最重要的关系。不要假装看到了未实际查看的图片。
+- 对比、边缘和细节密度既可以集中在一个或多个焦点，也可以分布在整个画面。
+- 对于写生与参考图，可以随时回看对象或图像。描述参考时，只报告实际看过的内容。
 
 **English**
 
-- Choose the format, subject placement, direction and visual balance. Block one or two large silhouettes before drawing eyes, leaves or cup rims.
+- Explore format, subject placement, direction and balance by blocking shapes or by developing the picture from a local detail such as an eye, a leaf or a cup rim.
 - Compare bounding-box proportions, main axes, intervals and negative spaces: the gap beside an arm or the sky between branches can reveal an error faster than a detail.
-- Choose a focal point. Reserve the strongest contrast, sharpest edges and richest detail rather than distributing them everywhere.
-- Observe an available reference before drawing. For imagined work, decide the essential relationships first. Do not claim to have inspected an image you have not viewed.
+- Contrast, edge clarity and density of detail can create one or several focal areas or draw attention across the picture.
+- Refer back to the subject or image as useful. Describe only the references you actually inspected.
 
 ### 构图与透视检查 / Composition and perspective checks
 
 **中文**
 
-- 把构图当成持续检查项：画幅与裁切、主体占比、留白、视觉重心、前中后景、主次对比。缩小看大剪影与明暗块，先改主体过小、重心失衡或背景抢戏，再画纹理；避免无意的切边、相切和拥挤边距。
-- 空间场景先明确视点、视平线和透视类型。同方向的平行线应共用消失点，消失点可以在画外；不同朝向的物体可以有不同消失点组，但须服从同一视点。用方盒、圆柱、轴线或临时辅助线校验，再细化。
-- 检查近大远小、遮挡次序、缩短、桌面与地面接触、椭圆开合和轴向。不要用漂亮的纹理掩饰结构错误。正交、平面化和夸张透视都可选择，但应出于表达，而不是无意漂移。
+- 缩略图可用于检查画幅、裁切、主体占比、留白、视觉重心、前中后景和对比，也能帮助区分刻意安排的相切、切边和紧凑边距与意外效果。
+- 画面采用线性透视时，视点、视平线与透视类型可用于检查方向关系。同方向的平行线共用消失点，消失点可以在画外。不同朝向的物体可以有不同消失点组。方盒、圆柱、轴线和临时辅助线都可用于校验。
+- 相对尺度、遮挡、缩短、接触关系与椭圆轴向都是处理空间的线索。正交、平面化和夸张透视也能表达不同的空间关系。
 
 **English**
 
-- Recheck format/crop, subject scale, negative space, balance, depth planes and contrast hierarchy throughout. Read silhouettes and value masses at thumbnail size. Correct weak placement before texture; avoid accidental tangencies and cramped margins.
-- Establish viewpoint, eye level/horizon and projection. Parallel directions share vanishing points, which may be off-canvas. Differently oriented objects may use different vanishing-point sets under the same view. Test with boxes, cylinders, axes or temporary guides.
-- Check relative scale, overlap, foreshortening, ground contact and ellipse orientation/openness. Texture cannot repair construction. Orthographic, flat and deliberately distorted styles are valid intentional choices.
+- A thumbnail can help assess crop, subject scale, negative space, balance, depth and contrast, as well as how tangencies, cut-off edges and tight margins read.
+- When using linear perspective, viewpoint, eye level, horizon and projection can help check directions. Parallel directions share vanishing points, which may be off-canvas. Differently oriented objects can use different vanishing-point sets. Boxes, cylinders, axes and temporary guides are available checks.
+- Relative scale, overlap, foreshortening, contact and ellipse orientation can help shape space. Orthographic, flat and deliberately distorted treatments offer other spatial effects.
 
 ## 2. 用光组织体积 / Organize volume with light
 
 **中文**
 
-1. 先定一个主光源；投影方向和受光面应彼此一致。
-2. 用三到五组明暗概括：亮面、中间调、形体暗面、投影，必要时单列最深接触暗部。
-3. 让笔触解释平面朝向与转折。球面是逐渐转暗，盒体可有明确明暗交界，不能都只用一圈深轮廓。
-4. 暗部的反光可以比核心暗部亮，但通常不应抢过受光面的整体亮度。
-5. 检查投影的落点与接触暗部，物体才像放在桌面上，而不是浮在背景前。
-6. 区分漫反射受光与镜面高光：亮面由光向与表面朝向组织，高光还取决于视线、粗糙度与材质。不要给每个物体随意点同一颗白点。主光源方向与大小也应和投影方向、软硬相符。
+- 需要用光表现体积时，可以考虑光源的位置、方向和大小，以及它们对受光面、投影方向和边缘软硬的影响。
+- 亮面、中间调、形体暗面、投影和接触暗部可按画面的明度结构选择、合并或细分。球面上的渐变、盒体平面之间的边界和轮廓线都可表现体积。
+- 反光可提亮暗面，投影落点和接触暗部可表现物体与表面的关系。漫反射受光取决于光向与表面朝向，镜面高光还受视线、材质和粗糙度影响。
 
 **English**
 
-1. Establish one principal light; lit planes and cast shadows should agree.
-2. Block three to five value families: light, middle tone, form shadow, cast shadow and, if needed, the darkest contact accents.
-3. Let marks explain planes and turning surfaces. A sphere turns gradually; a box can change value abruptly. Neither needs an equally dark outline everywhere.
-4. Reflected light may lift a shadow without breaking the larger light/shadow separation.
-5. Place cast shadows and contact accents convincingly so objects sit on a surface rather than float.
-6. Distinguish diffuse illumination from specular highlights: lit planes depend on light and surface orientation; highlights also depend on view and roughness/material. They are not an arbitrary white dot on every object. Light direction and size should agree with cast-shadow direction and softness.
+- When using light to describe volume, consider how light position, direction and size affect lit planes, cast shadow direction and edge softness.
+- Lights, midtones, form shadows, cast shadows and contact accents can be selected, grouped or subdivided according to the picture. Gradients on a sphere, plane changes on a box and contours can all convey form.
+- Reflected light can lift a shadow. Cast shadows and contact accents can help describe how objects meet a surface. Diffuse illumination depends on light and surface orientation. Specular highlights also depend on the view and on material roughness.
 
 ## 3. 铅笔与炭笔 / Graphite and charcoal
 
 **中文**
 
-- 起形用轻线，先纠正比例；铺大灰面用侧锋，不必用成百上千条同样粗细的线填满。
-- 排线沿体积走；通过间距、方向、长短、压力和交叉层数组织灰度，而不是把噪点等同于素描质感。
-- 硬铅用于克制的细线，软铅用于较深、较宽的调子。炭条适合大暗面和可擦揉浮粉，不能只当作更粗的铅笔。
-- 纸擦笔只软化需要软化的地方。保留一些明确的结构边、转折和新鲜排线，避免把一切揉成均匀的灰雾。
+- 轻线可以用来试形，侧锋可以铺出宽调子。密集线条或点状笔迹同样可以组织调子、纹理和节奏。
+- 排线的间距、方向、长度、压力和交叉层数可以表现体积，也可以服务于平面图案和表现力。
+- 铅笔硬度影响沉积。硬铅适合较浅的笔迹，软铅可加深调子。炭笔留下可擦揉的浮粉。
+- 纸擦笔会搬运浮粉并软化笔迹。擦揉范围取决于希望保留的结构边、排线或过渡效果。
 - 可塑橡皮用于逐渐提亮和找形；普通橡皮用于更明确的修正。提亮是移走已建模材料，不是往纸上盖白漆。
 - 新干性材料流程使用 `dry_media:true` 与有序 `operations`。旧 `brush:pencil/charcoal` + `strokes` 仍是风格化线条路径；旧路径没有因为新功能而自动获得材料擦除、侧锋接触或浮粉搬运。
 
 **English**
 
-- Start lightly and correct proportions. Use side strokes for broad values instead of filling every area with hundreds of identical lines.
-- Hatch along the form. Vary spacing, direction, length, pressure and cross-hatching layers to organize tone; random noise alone is not convincing drawing texture.
-- Hard graphite suits restrained fine marks; softer grades support darker, broader passages. Charcoal has a distinct broad, loose-powder character, not merely a thicker pencil line.
-- Smudge selectively. Retain structural edges, turning points and some fresh hatching instead of rubbing everything into uniform fog.
+- Light lines can test shapes and side contact can create broad tones. Dense lines or dots can also build tone, texture and rhythm.
+- Hatching spacing, direction, length, pressure and cross-hatching layers can describe form or serve a flat pattern or expressive effect.
+- Graphite grade affects deposition. Hard grades can make lighter marks and soft grades can deepen tones. Charcoal leaves loose powder that can be smudged.
+- Smudging moves loose powder and softens marks. Its extent depends on the edges, hatching and transitions you want in the picture.
 - Use kneaded erasers to lift gradually and regular erasers for firmer corrections. Lifting removes modeled material; it does not paint white over the paper.
 - Use `dry_media:true` and ordered `operations` for the material workflow. Legacy `brush:pencil/charcoal` with `strokes` remains the stylized path; it does not automatically gain material erasing, side-tip contact or powder transport.
 
@@ -80,15 +78,15 @@ The renderer makes marks; the model makes visual decisions. These are working me
 
 **中文**
 
-先铺大色块与明暗，不要让颜色细节掩盖结构。顺形用笔，以软硬边和虚实变化组织空间；背景与暗部可以适度丢边，焦点处再明确。薄涂、较实的色块、少量厚涂高光可以形成层次，不必全画面堆厚。
+大色块、小笔触、软硬边、薄涂和厚涂都可按画面需要搭配。顺形笔触与虚实边缘能帮助组织空间，逆向笔触、均匀厚涂或遍布全图的细节也可用来表现纹理、节奏和光感。
 
-未干交叠会拾色混色：利用它连接相近色；需要干净亮色时，减少无目的来回搅动。画刀不是万能锐化器，它的定向接触和拖带也应服务于形体。油画续画使用 `.qlpaint` 湿画状态；不要把一张 PNG 当作尚未干的颜料状态。
+未干油彩与新笔触交叠时会拾色和混色。干化后再画可以让后续笔触的颜色保持独立。画刀角度影响接触与拖带。有 `.qlproject` 或 `.qlpaint` 可续画湿油彩，导入的 PNG 则作为固定底图。
 
 **English**
 
-Establish large colour and value masses before small colour variations. Follow the form with directional strokes and vary hard, soft and lost edges. Lose some boundaries into adjacent values; clarify the focal area. Contrast thin passages, more solid masses and selective impasto highlights rather than loading every inch equally.
+Large colour masses, small marks, hard and soft edges, thin passages and impasto can be combined as the picture needs. Strokes that follow the form and edges that merge into adjacent values can shape space. Cross-form marks, even impasto and detail across the picture can serve texture, rhythm or light.
 
-Wet overlap picks up and mixes pigment: use it to connect related colours, but avoid aimless stirring when a clean light is needed. A palette knife is not a universal sharpening filter; its orientation and drag should describe the subject. Continue wet oils from `.qlpaint`, not from the flattened pixels of a PNG.
+Wet overlap picks up and mixes pigment. Drying allows subsequent strokes to retain their own colour. Palette-knife orientation affects contact and drag. A `.qlproject` or `.qlpaint` retains the wet state for continuation. An imported PNG is a fixed base.
 
 ### 借鉴真实作画，不固定范式 / Borrow practice, not a rigid recipe
 
@@ -112,29 +110,31 @@ Select the brush for the next pass with `brush`. Use `operations` to erase, smud
 
 **中文**
 
-不要因为担心 “overworking／画过头” 就过早停笔。作品往往需要几轮明确的修正：比例、明暗分组、体积、边缘，最后才是细节。多画几轮本身不是问题；没有观察和目标地反复加笔才是问题。
+预览可以帮助判断某轮处理对画面的影响。修正的顺序、范围和轮数取决于作品目标及用户指定的限制。
 
-每轮尽量遵循：
+可以考虑：
 
 1. 实际查看刚生成的图片（当前环境可查看时）；若无法查看，明确说明限制，不要假称已完成视觉检查。
-2. 只选一到三个最影响画面的差距，例如“主体偏小”“暗部太碎”“焦点边缘不够清晰”。
+2. 根据预览辨别需要修改的地方，例如主体占比、暗部结构、边缘或纹理。
 3. 为每个差距安排具体操作，再输出检查；保护已经奏效的区域。
 4. 保存合适的干画或湿画节点，需要时从旧节点分支。PNG 适合展示，材料状态适合继续编辑。
-5. 用户要求已经满足就停下；用户指定了轮数、调用次数、时间、费用或完成度时，始终以此为界。不无限循环，不为堆笔数而加笔。
+5. 按用户要求判断完成度，遵守用户给出的轮数、调用次数、时间或费用限制。
 
 **English**
 
-Do not stop prematurely merely from fear of overworking. Several focused revisions can improve proportions, value grouping, volume and edges before details. More passes are not inherently a problem; unobserved, purposeless repetition is.
+A preview can show how a pass affects the picture. Choose the order, scope and number of revisions according to the artistic goal and the constraints the user sets.
 
-For each pass:
+Options include:
 
 1. Actually inspect the rendered image when the environment permits it. If unavailable, state that limitation rather than claiming visual verification.
-2. Choose one to three important mismatches, such as a small subject, fragmented shadows or an unclear focal edge.
+2. Identify what the preview suggests changing, such as subject scale, shadow structure, edges or texture.
 3. Make specific corrections, render and inspect again. Protect areas that already work.
 4. Save appropriate dry or wet checkpoints and branch when useful. PNGs show the image; material states preserve its editable simulation.
-5. Stop when the request is satisfied or the user's pass, call, time, cost or detail limits are reached. Never loop indefinitely or add strokes just to increase a count.
+5. Assess completion against the user's request and honor any pass, call, time or cost limits they set.
 
 ## 6. 三个练习 / Three exercises
+
+以下步骤是各练习的示范，可按需要调整。Each exercise illustrates one possible approach that you can adapt.
 
 ### A. 三明度球体 / Three-value sphere
 
