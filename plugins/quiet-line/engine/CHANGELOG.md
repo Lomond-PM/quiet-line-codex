@@ -1,5 +1,10 @@
 # Changelog / 更新记录
 
+## 1.5.1 — 2026-11-23
+
+- 修复 DSH 工程已保存但绘画工具报 `not lossless JSON` 的问题。成功返回预览时省略空提示，预览不可用时仍返回 PNG 路径和说明。
+- Fix DSH project draw results rejected as `not lossless JSON` after the drawing had already saved. Preview responses omit absent fields and still report the saved PNG if a preview cannot be attached.
+
 ## 1.5.0 — 2026-11-23
 
 - 可以创建空白工程，并在同一画布上交替使用全部八种画笔。工程保留油彩、干性材料和普通笔迹，换笔后可以继续湿拾色、擦除与擦揉。

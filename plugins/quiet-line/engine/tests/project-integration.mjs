@@ -17,7 +17,8 @@ async function assertMatchingPixels(actual, expected, message, tolerance = 0) {
 }
 const cwd=fs.mkdtempSync(path.join(os.tmpdir(),'quiet-line-project-tool-'));
 const tools=new Map();
-const context={tools:{register(t){tools.set(t.name,t);}},workingDirectory:{ensure:async()=>cwd},get(){}};
+let attachments;
+const context={tools:{register(t){tools.set(t.name,t);}},workingDirectory:{ensure:async()=>cwd},get(key){return key === 'attachments' ? attachments : undefined;}};
 apply(context);
 assert.equal(tools.size,2);
 const draw=tools.get('quiet_line_draw'), manager=tools.get('quiet_line_project');
@@ -27,6 +28,31 @@ const png=r=>fs.readFileSync(r.absolutePath);
 const meta=p=>readProject(cwd,p);
 const clean=()=>assert.equal(fs.readdirSync(cwd).some(n=>n.startsWith('.quiet-line-project-')),false,'owned temporary bridge directories must be removed');
 const stroke={points:[[.2,.5],[.8,.52]],width:2,color:'#a04a25'};
+// DSH requires a lossless JSON payload before it can render an attachment.
+attachments = {
+  imageLimits: { maxImageBytes: 2 ** 24, maxImageDimension: 2560 },
+  saveImage({ data, mediaType, name }) {
+    return {
+      attachmentId: 'project-preview', mediaType, name, bytes: data.length,
+      width: data.readUInt32BE(16), height: data.readUInt32BE(20)
+    };
+  }
+};
+const attached = await run({
+  project: 'preview.qlproject', size: 320, brush: 'brush', strokes: [stroke], output: 'preview.png'
+});
+assert.ok(!Object.hasOwn(attached, 'note'), 'successful project previews must omit absent notes');
+assert.deepEqual(JSON.parse(JSON.stringify(attached)), attached);
+assert.equal(attached.image.attachmentId, 'project-preview');
+assert.equal(draw.output.render({}, attached)[1].type, 'image');
+attachments.imageLimits.maxImageBytes = 1;
+const withoutPreview = await run({ project: 'preview.qlproject', output: 'preview-over-limit.png' });
+assert.deepEqual(JSON.parse(JSON.stringify(withoutPreview)), withoutPreview);
+assert.ok(!Object.hasOwn(withoutPreview, 'image'));
+assert.match(withoutPreview.note, /attachment limit/);
+assert.equal((await meta('preview.qlproject')).head, withoutPreview.projectStep);
+attachments = undefined;
+
 const wetOpts={brush:'oil',size:320,seed:217,grain:20,strokes:[stroke]};
 const wet=await run({...wetOpts,project:'wet.qlproject',project_checkpoint:'start',output:'wet-first.png'});
 assert.equal(wet.projectMode,'mixed'); assert.equal(wet.projectStep,1); assert.equal(wet.projectRevision,1);

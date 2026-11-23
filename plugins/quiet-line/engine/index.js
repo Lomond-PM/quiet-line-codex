@@ -297,10 +297,9 @@ function outputPath(cwd, requested, title, seed) {
 
 async function attachImage(ctx, png, name, limits) {
   const attachments = ctx.get('attachments');
-  if (!attachments) return { image: undefined, note: 'No attachment service is mounted; the PNG is on disk only.' };
+  if (!attachments) return { note: 'No attachment service is mounted; the PNG is on disk only.' };
   if (png.length > limits.maxImageBytes) {
     return {
-      image: undefined,
       note: `The PNG is ${png.length} bytes, above the ${limits.maxImageBytes}-byte attachment limit; the file is on disk only.`
     };
   }
@@ -308,7 +307,6 @@ async function attachImage(ctx, png, name, limits) {
     const ref = await attachments.saveImage({ data: png, mediaType: 'image/png', name });
     if (ref.width > limits.maxImageDimension || ref.height > limits.maxImageDimension) {
       return {
-        image: undefined,
         note: `The rendered image is ${ref.width}×${ref.height}, above the ${limits.maxImageDimension}px attachment dimension limit; the file is on disk only.`
       };
     }
@@ -320,12 +318,10 @@ async function attachImage(ctx, png, name, limits) {
         width: ref.width,
         height: ref.height,
         ...(ref.name === undefined ? {} : { name: ref.name })
-      },
-      note: undefined
+      }
     };
   } catch (error) {
     return {
-      image: undefined,
       note: `The image could not be attached: ${error && error.message ? error.message : String(error)}`
     };
   }
@@ -338,7 +334,7 @@ function renderValue(value) {
   ];
   if (value.project) {
     lines.push(`Project: ${value.project} — ${value.projectMode} step ${value.projectStep}, revision ${value.projectRevision}. Editable material state and this PNG are auto-saved in the single project file.`);
-    lines.push('Continue with project set to this same file. Use quiet_line_project to list history, restore, checkpoint, branch or export; no loose state snapshots are needed. Set project_material explicitly only when changing wet/dry phases; a switch fixes the current image as the next phase base.');
+    lines.push('Continue with project set to this same file. Use quiet_line_project to list history, restore, checkpoint, branch or export; no loose state snapshots are needed. Choose a brush or dry-media operations for the next pass. Changing brushes keeps existing material states editable.');
     if (value.projectTransition) lines.push(value.projectTransition);
     if (value.note) lines.push(value.note);
     return lines.join('\n');
