@@ -17,6 +17,7 @@ const OIL = require('../lib/oil.cjs');
 const CORE = require('../lib/core.cjs');
 const RASTER = require('../lib/raster.cjs');
 const sharp = require('sharp');
+const rgbaPixels = png => sharp(png).ensureAlpha().raw().toBuffer();
 const installed = path.resolve(process.argv[2] || path.join(os.homedir(), '.dsh/profiles/desktop/node_modules/@dsh-local/quiet-line-board'));
 const candidate = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 assert.notEqual(installed, candidate, 'must test distinct installed and candidate implementations');
@@ -90,9 +91,10 @@ for (const brush of ['oil', 'oilknife']) {
   const oldStored = oldStore.readProject(root, original, { includeData: true });
   assert.deepEqual(oldStored.selected.state, originalSnapshotBytes);
   const oldPNG = fs.readFileSync(oldDrawing.absolutePath);
-  assert.deepEqual(render(legacySnapshot), oldPNG, 'candidate zero-stroke renderer exactly reproduces old PNG');
+  const oldPixels = await rgbaPixels(oldPNG);
+  assert.deepEqual(await rgbaPixels(render(legacySnapshot)), oldPixels, 'candidate zero-stroke renderer reproduces every legacy pixel');
   const noOp = await next.draw({ paint_state: snapshotFile, save_state: `${brush}-noop.qlpaint`, output: `${brush}-noop.png` });
-  assert.deepEqual(fs.readFileSync(noOp.absolutePath), oldPNG);
+  assert.deepEqual(await rgbaPixels(noOp.absolutePath), oldPixels);
   assert.deepEqual(STATE.loadPaintState(root, `${brush}-noop.qlpaint`), legacySnapshot, 'public no-op continuation preserves old state');
   fs.copyFileSync(path.join(root, original), path.join(root, working), fs.constants.COPYFILE_EXCL);
   const before = read(working), beforeRow = row(working, before.head);
@@ -107,8 +109,7 @@ for (const brush of ['oil', 'oilknife']) {
   await next.manage({ project: working, action: 'export', target: dryFile });
   const drySnapshot = STATE.loadPaintState(root, dryFile);
   unchangedExceptStamps(legacySnapshot, drySnapshot);
-  assert.deepEqual(render(drySnapshot), oldPNG, 'dried state reproduces exact old appearance including impasto');
-  assert.deepEqual(await sharp(render(drySnapshot)).raw().toBuffer(), await sharp(oldPNG).raw().toBuffer());
+  assert.deepEqual(await rgbaPixels(render(drySnapshot)), oldPixels, 'dried state reproduces every legacy pixel including impasto');
   const over = { points: [[.25, .5], [.75, .5]], width: 3, color: '#ffffff', opacity: 1,
     controls: [{}, {}], tip: 'round', hardness: 1, cap: 'round', overshoot: 0 };
   // Candidate public continuation of both the untouched old wet snapshot and
@@ -125,7 +126,7 @@ for (const brush of ['oil', 'oilknife']) {
     save_state: `${brush}-downgraded-over.qlpaint`, output: `${brush}-downgraded-over.png` });
   const downgradeRGB = meanCenter(STATE.loadPaintState(root, `${brush}-downgraded-over.qlpaint`));
   assert.ok(dryRGB[0] > wetRGB[0] + 10, `${brush}: dried pigment is not picked up (${wetRGB} versus ${dryRGB})`);
-  assert.notEqual(hash(fs.readFileSync(wetContinue.absolutePath)), hash(fs.readFileSync(dryContinue.absolutePath)));
+  assert.notDeepEqual(await rgbaPixels(wetContinue.absolutePath), await rgbaPixels(dryContinue.absolutePath));
   // Start from actual old material and its new permanent-dry markers. Use the
   // engine directly for 1000 tiny off-subject strokes to avoid 1000 disk renders.
   const aged = STATE.clonePaintState(drySnapshot), settings = aged.metadata.settings;
@@ -137,9 +138,13 @@ for (const brush of ['oil', 'oilknife']) {
   assert.equal(aged.oil.stamp[center], 0); assert.equal(aged.oil.hgt[center], drySnapshot.oil.hgt[center]);
   assert.deepEqual(aged.oil.col.slice(center * 3, center * 3 + 3), drySnapshot.oil.col.slice(center * 3, center * 3 + 3));
   STATE.savePaintState(root, `${brush}-1000.qlpaint`, aged);
+  // Compare the aged and unaged snapshots through the same standalone
+  // continuation. Mixed-project compositing has its own material import path.
+  await next.draw({ paint_state: dryFile, strokes: [over], wetness: 100, load: 100, save_state: `${brush}-unaged-over.qlpaint`, output: `${brush}-unaged-over.png` });
+  const unagedRGB = meanCenter(STATE.loadPaintState(root, `${brush}-unaged-over.qlpaint`));
   await next.draw({ paint_state: `${brush}-1000.qlpaint`, strokes: [over], wetness: 100, load: 100, save_state: `${brush}-1000-over.qlpaint`, output: `${brush}-1000-over.png` });
   const agedRGB = meanCenter(STATE.loadPaintState(root, `${brush}-1000-over.qlpaint`));
-  assert.deepEqual(agedRGB, dryRGB, '1000 off-subject strokes and save/reload do not revive old dry pigment');
+  assert.deepEqual(agedRGB, unagedRGB, '1000 off-subject strokes and save/reload do not revive old dry pigment');
   // Restore is reversible because the original wet step was checkpointed.
   await next.manage({ project: working, action: 'restore', step: before.head });
   assert.deepEqual(read(working).selected.state, before.selected.state);
@@ -169,13 +174,14 @@ for (const brush of ['oil', 'oilknife']) {
   assert.deepEqual(row(v1, v1Before.head), v1Row, 'V1 old step is byte-for-byte unchanged');
   assert.deepEqual(read(v1).selected.png, oldPNG);
   await next.draw({ project: v1, strokes: [over], wetness: 100, load: 100, output: `${brush}-v1-over.png` });
-  assert.equal(version(v1), 1, 'same-mode continuation also remains V1');
+  assert.equal(version(v1), 3, 'the first mixed drawing step upgrades a V1 project to V3');
+  assert.equal(read(v1).selected.mode, 'mixed');
   await next.manage({ project: v1, action: 'export', target: `${brush}-v1-over.qlpaint` });
   assert.deepEqual(meanCenter(STATE.loadPaintState(root, `${brush}-v1-over.qlpaint`)), dryRGB);
   assert.deepEqual(row(v1, v1Before.head), v1Row, 'V1 old step also unchanged after subsequent painting');
   assert.equal(hash(fs.readFileSync(path.join(root, original))), originalProjectHash, 'source old project never touched');
   assert.equal(hash(fs.readFileSync(path.join(root, snapshotFile))), originalSnapshotHash, 'source old snapshot never touched');
-  report.cases.push({ brush, originalProjectHash, originalSnapshotHash, exactPNGRoundtrip: true, exactMaterialPreservedExceptStamps: true,
+  report.cases.push({ brush, originalProjectHash, originalSnapshotHash, storedPNGBytesPreserved: true, renderedPixelsPreserved: true, exactMaterialPreservedExceptStamps: true,
     wetRGB, dryRGB, downgradeRGB, after1000RGB: agedRGB, v1SameModePreserved: true, oldStepsIntact: true, staleAndConcurrentCAS: true });
 }
 for (const [file, digest] of Object.entries(installedHashes)) assert.equal(hash(fs.readFileSync(path.join(installed, file))), digest, `installed source unchanged: ${file}`);

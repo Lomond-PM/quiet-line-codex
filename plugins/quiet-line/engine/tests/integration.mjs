@@ -5,16 +5,66 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { apply } from '../index.js';
 import { createHash } from 'node:crypto';
+import { deflateSync } from 'node:zlib';
 const require = createRequire(import.meta.url);
 const CORE = require('../lib/core.cjs');
 const RASTER = require('../lib/raster.cjs');
 const sharp = require('sharp');
+const rgbaPixels = png => sharp(png).ensureAlpha().raw().toBuffer();
 const { loadBaseImage } = require('../lib/base-image.cjs');
 const { loadPaintState } = require('../lib/paint-state.cjs');
 let tool;
 const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'quiet-line-integration-'));
 apply({ tools: {register(t){if(t.name==='quiet_line_draw')tool=t;}}, workingDirectory: {ensure: async()=>cwd}, get(){return undefined;} });
 const run = args=>tool.execute(args, {agent:{id:'test'}});
+function unfilteredPNGSize(samples, width, height, channels) {
+ const stride = width * channels;
+ const raw = Buffer.alloc((stride + 1) * height);
+ for (let y = 0; y < height; y++) {
+  raw.set(samples.subarray(y * stride, (y + 1) * stride), y * (stride + 1) + 1);
+ }
+ // Signature, IHDR, IDAT framing, and IEND occupy 57 bytes in the 1.6.0 PNG.
+ return 57 + deflateSync(raw, {level:9}).length;
+}
+// Exercise edge predictors, nonzero byte offsets, and an alpha-zero pixel
+// whose RGB must survive. Compare native samples through an independent decoder.
+for (const [width, height] of [[1, 1], [1, 9], [11, 1], [173, 97]]) {
+ for (const channels of [3, 4]) for (const opaque of channels === 4 ? [false, true] : [true]) {
+  const storage = new Uint8Array(width * height * channels + 16).fill(91);
+  const samples = storage.subarray(7, 7 + width * height * channels);
+  const expected = Buffer.alloc(width * height * 4);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+   const i = y * width + x;
+   const rgba = [(23 + 7*x + y) & 255, (89 + y*11) & 255, (53 + x*y) & 255,
+    opaque ? 255 : [0, 1, 127, 255][i % 4]];
+   samples.set(rgba.slice(0, channels), i * channels);
+   expected.set(rgba, i * 4);
+  }
+  const before = storage.slice();
+  const encode = () => RASTER.encodePNG(width, height, samples, channels);
+  const png = encode();
+  const baseline = unfilteredPNGSize(samples, width, height, channels);
+  assert.ok(png.length <= baseline, 'encoding never exceeds the no-filter baseline');
+  if (width > 1 && height > 1) assert.ok(png.length < baseline, 'the patterned canvas compresses smaller');
+  assert.deepEqual(encode(), png, 'identical inputs yield identical PNG bytes');
+  const {data, info} = await sharp(png).ensureAlpha().raw().toBuffer({resolveWithObject:true});
+  assert.deepEqual([info.width, info.height, info.channels], [width, height, 4]);
+  assert.deepEqual(data, expected, 'every RGBA sample, including transparent RGB, round-trips');
+  assert.deepEqual(storage, before, 'encoding preserves the input and its surrounding storage');
+ }
+}
+for (const sparse of [false, true]) {
+ const width = 127, height = 83, samples = new Uint8Array(width * height * 4);
+ let seed = 307;
+ for (let i = 0; i < samples.length; i++) {
+  seed = (Math.imul(1664525, seed) + 1013904223) >>> 0;
+  if (!sparse || Math.floor(i / 4) % 313 === 0) samples[i] = seed >>> 24;
+ }
+ const png = RASTER.encodePNG(width, height, samples, 4);
+ assert.ok(png.length <= unfilteredPNGSize(samples, width, height, 4), 'sparse and noisy canvases never grow');
+ assert.deepEqual(RASTER.encodePNG(width, height, samples, 4), png);
+ assert.deepEqual(await rgbaPixels(png), Buffer.from(samples));
+}
 const a = {points:[[.15,.45],[.5,.46],[.85,.4]],color:'#ae3829',width:3,tip:'flat',angle:10,flow:.8,controls:[{pressure:0},{pressure:1},{pressure:0}]};
 const b = {points:[[.5,.15],[.48,.5],[.52,.85]],color:'#23578a',width:3,tip:'flat',angle:75,hardness:.35};
 const opts = {brush:'oil',surface:'linen',seed:623,size:320,grain:35,weight:4,wobble:0,pressure:0};
@@ -90,27 +140,28 @@ if(previous){
   const style={seed:623,brush,surface:'linen',weight:3,wobble:.58,pressure:.66,texture:.46,padding:.02};
   const sketch={items:[CORE.stroke([[.1,.2],[.35,.6],[.8,.3]],{width:2,color:'#a04030'})]};
   const r={width:320,height:320,seed:623,surface:'linen'};
-  assert.deepEqual(RASTER.renderPNG(CORE.buildSketch(sketch,style,r),r).png,OLD_RASTER.renderPNG(OLD_CORE.buildSketch(sketch,style,r),r).png,`legacy ${brush}`);
+  assert.deepEqual(await rgbaPixels(RASTER.renderPNG(CORE.buildSketch(sketch,style,r),r).png),
+   await rgbaPixels(OLD_RASTER.renderPNG(OLD_CORE.buildSketch(sketch,style,r),r).png), `legacy ${brush} pixels`);
  }
- console.log('legacy: all 8 brushes byte-identical to baseline');
+ console.log('legacy: all 8 brushes pixel-identical to baseline');
 }
-// Frozen before widening the public width range: upper old bound, all eight
-// brushes, with and without controls. Guards deterministic PNG bytes, not just geometry.
-const legacyHashes = {
- ink:['ec0db895b748be49752e1651c0777d2c6a15301ac5951274a605a872d760a8e5','ffa13fbc9e11f0b5a7ac9168567f49890902f23231ee3b5c736e873aa03ce081'],
- fountain:['74a479d3af469e7eafb205f7292d44fcd5102e5104964e3fd48bd44f852ea3c7','f4bf39e5378dcb969088ce52eefa8dde2ed4c6dd5a6a39a135faa18c5a9de84b'],
- pencil:['fdd0b40e86a1b6cd4ff5c29772a9b9a4e320f860573d578426ada279dee8af46','86f729b71c6975ce83e76355cc8b6f29b4160546c453c9ac0d66774cfbb4073b'],
- charcoal:['32826926b2db0ec5743fb3ce1a4a0fd46dab085aaa48e8f25f2210b175240fe4','1cca7e23eabe5c9a505b01bec0b1a84202c6b7218c0e184a9d3d8eaae77ef0ac'],
- brush:['c97a6c5ea7869b072bd708da2f80b647ab2dbd32b8c8096948180aa9c542b747','3f145816f9bc54ad02dd55a5498e725f97087669c1ee6739b9012edbae76ee11'],
- marker:['4935edb2cf55a67e9a6006adbc9dcf209a0702f7a117b907ab3b8ab1b055cc1f','af1c1c322d653e3dcda6714eb0ff4e423929c837fecbc2a68e2aa4403ee5b462'],
- oil:['6bd4d484ab365d58402cb7dab1de37df78445714bd1c71ec16c775dcdf58d982','bdc0d6f8ec109b0183d4d4945fe862bfd61edef2c1afe8bb8f12ad7aa1124217'],
- oilknife:['2b7f1d383e66ceb5697a620f43e8b91dcab883d3452cfbf5ce5fbea95a27326d','701821f91976d33500faa31c931644d5f38a2f401ad9ad305a693548e83fa712']
+// SHA-256 of decoded RGBA samples from the installed 1.6.0 engine. Each
+// source PNG was first verified against its preexisting frozen PNG hash.
+const legacyPixelHashes = {
+ ink:['5b1885e723f281ed718a2b40e27f17106a24a8d3fe2a7b233024f94807008100','077b84ccb674370c1eaa4782fa766606f2c558432484c977dbde9df72cd6642c'],
+ fountain:['458b8878989e1ff953a3f660a862fc2f552ce41c105a97fd4daa0f764417f1e7','4b8d16694cdab96c856995cae58c42d120ba1ab47f0fd3e8f7cc462195a467ac'],
+ pencil:['d24325d751bcdea08172582606e3ae03c0ae6931d1dbfa41da1799210c657297','6e1bc615c84f8ff4f52e134b9123c276acf4fb0ef017ad0db6c148b875dc476c'],
+ charcoal:['681e6c92261049f14fecce36b5863f93cc6eb82495e4aa752545d0e3a6800d5d','c9cf933f928c6460954b6bd2f2d126c195ba4ee3f4fee3d2a8211cbe30c591a0'],
+ brush:['70124e0b559551e1f9cae48026cbc0cc2fdde9ed8e6ccc160e90d3bcebc5a7d2','6864adbbf7e1de2904458f03a018971794a71aeda9b6672daea5be9e6d73b5cb'],
+ marker:['555b4297612d591e8a340e5b05de55179f460b73e9e55842163b4009ebae2976','a6bb2c87f7ea5c69b174dbc2b2ecdd91bfe76b7711e8f00eb570ca11aa957b09'],
+ oil:['7c10d9155c476112b817d92a37c5e9e7d4775c7898816830deda653b4d252b41','9c942f441343b613ce91510153f7dd6b0f36da0fa8be16ee72a9ea5e0ef34c65'],
+ oilknife:['6259d1f089d4f179b3e8bf7eb1f719953fbbb08ed14055af38ce3e8bd7dc8616','e434827f579f956e857a85835afcdea988cfe2dc85d8a5c691ce70596d617d32']
 };
-for(const [brush, hashes] of Object.entries(legacyHashes)) for(const controlled of [false,true]) {
+for(const [brush, hashes] of Object.entries(legacyPixelHashes)) for(const controlled of [false,true]) {
  const style={brush,seed:623,weight:4.5,wobble:0,pressure:0,texture:.46,padding:0};
  const item={type:'stroke',points:[[.1,.5],[.9,.5]],width:3,...(controlled?{controls:[{width:3},{width:3}],tip:'flat',angle:30}:{})};
  const png=RASTER.renderPNG(CORE.buildItems([item],style,320),{width:320,height:320,seed:623}).png;
- assert.equal(createHash('sha256').update(png).digest('hex'),hashes[Number(controlled)],`${brush} controlled=${controlled}: old bytes unchanged`);
+ assert.equal(createHash('sha256').update(await rgbaPixels(png)).digest('hex'), hashes[Number(controlled)], `${brush} controlled=${controlled}: frozen pixels`);
 }
 const strokeSchema=tool.parameters.properties.strokes.items.properties;
 assert.equal(strokeSchema.width.minimum,.1); assert.equal(strokeSchema.width.maximum,30);
@@ -135,5 +186,5 @@ const broadFirst=await run({...opts,strokes:[broadA],save_state:'broad.qlpaint',
 const broadResume=await run({paint_state:broadFirst.paintState,strokes:[broadB],output:'broad-resume.png'});
 const broadSingle=await run({...opts,strokes:[broadA,broadB],output:'broad-single.png'});
 assert.deepEqual(fs.readFileSync(broadResume.absolutePath),fs.readFileSync(broadSingle.absolutePath));
-console.log('width: PASS — .1..30 schema/runtime, controls 0..3, all brushes broaden, 16 frozen PNG hashes, broad split equality');
+console.log('width: PASS — .1..30 schema/runtime, controls 0..3, all brushes broaden, 16 frozen RGBA hashes, broad split equality');
 console.log('integration: PASS',cwd);

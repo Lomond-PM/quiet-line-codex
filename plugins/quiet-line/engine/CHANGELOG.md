@@ -1,5 +1,10 @@
 # Changelog / 更新记录
 
+## 1.6.1 — 2026-11-27
+
+- 新生成的 PNG 会尝试逐行选择无损预测滤波，并保留较小的压缩结果。RGB、Alpha 和全透明像素中的 RGB 均按原始字节保存。旧工程仍导出当时保存的 PNG。
+- New PNGs compare adaptive row filtering with the original encoding and keep the smaller stream. RGB and alpha samples are preserved, including RGB under fully transparent pixels. Exports of existing history retain their stored PNG bytes.
+
 ## 1.6.0 — 2026-11-27
 
 - 新工程可在步骤之间共享相同的材质数据。`compact` 将现存历史和检查点完整复制到新文件，`output: false` 在工程内保存画面并省略外部 PNG。

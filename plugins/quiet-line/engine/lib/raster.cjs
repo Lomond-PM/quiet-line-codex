@@ -299,38 +299,68 @@ function composite(width, height, ink, ss, paper, seed, grain, baseRGBA) {
 
 /* ---------- PNG writer ------------------------------------- */
 
-const CRC_TABLE = (() => {
-  const table = new Uint32Array(256);
-  for (let n = 0; n < 256; n++) {
-    let c = n;
-    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
-    table[n] = c >>> 0;
-  }
-  return table;
-})();
-
-function crc32(buf) {
-  let c = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
-  return (c ^ 0xffffffff) >>> 0;
+function chunk(type, data) {
+  const bytes = Buffer.allocUnsafe(data.length + 12);
+  bytes.writeUInt32BE(data.length, 0);
+  bytes.write(type, 4, 4, 'ascii');
+  data.copy(bytes, 8);
+  bytes.writeUInt32BE(zlib.crc32(bytes.subarray(4, 8 + data.length)), 8 + data.length);
+  return bytes;
 }
 
-function chunk(type, data) {
-  const len = Buffer.alloc(4);
-  len.writeUInt32BE(data.length, 0);
-  const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
-  const crc = Buffer.alloc(4);
-  crc.writeUInt32BE(crc32(body), 0);
-  return Buffer.concat([len, body, crc]);
+// PNG predicts each byte from neighbours in the same channel. Score the
+// residuals as signed bytes so that small differences across 0 count as small.
+const residualCost = Uint8Array.from({ length: 256 }, (_, value) => Math.min(value, 256 - value));
+
+function applyScanlineFilters(raw, pixels, stride, channels) {
+  const zeroRow = Buffer.alloc(stride);
+  const candidates = Array.from({ length: 4 }, () => Buffer.allocUnsafe(stride));
+  const [sub, up, average, paeth] = candidates;
+  const scores = new Uint32Array(5);
+  let changed = false;
+  for (let start = 0, row = 0; start < pixels.length; start += stride, row += stride + 1) {
+    // Empty rows in a transparent layer already have the lowest possible score.
+    if (pixels.compare(zeroRow, 0, stride, start, start + stride) === 0) continue;
+    scores.fill(0);
+    for (let x = 0; x < stride; x++) {
+      const pos = start + x, value = pixels[pos];
+      const left = x >= channels ? pixels[pos - channels] : 0;
+      const above = start ? pixels[pos - stride] : 0;
+      const corner = start && x >= channels ? pixels[pos - stride - channels] : 0;
+      const dl = Math.abs(above - corner), da = Math.abs(left - corner);
+      const dc = Math.abs(left + above - 2 * corner);
+      const predictor = dl <= da && dl <= dc ? left : da <= dc ? above : corner;
+      sub[x] = value - left;
+      up[x] = value - above;
+      average[x] = value - ((left + above) >>> 1);
+      paeth[x] = value - predictor;
+      scores[0] += residualCost[value];
+      scores[1] += residualCost[sub[x]];
+      scores[2] += residualCost[up[x]];
+      scores[3] += residualCost[average[x]];
+      scores[4] += residualCost[paeth[x]];
+    }
+    let best = 0;
+    for (let filter = 1; filter < scores.length; filter++) {
+      if (scores[filter] < scores[best]) best = filter;
+    }
+    if (best) {
+      raw[row] = best;
+      candidates[best - 1].copy(raw, row + 1);
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 function encodePNG(width, height, rgb, channels = 3) {
   if (channels !== 3 && channels !== 4) throw new Error('PNG encoder expects RGB or RGBA');
   const stride = width * channels;
-  const raw = Buffer.alloc((stride + 1) * height);
+  const pixels = Buffer.from(rgb.buffer, rgb.byteOffset, stride * height);
+  const raw = Buffer.allocUnsafe((stride + 1) * height);
   for (let y = 0; y < height; y++) {
     raw[y * (stride + 1)] = 0;
-    Buffer.from(rgb.buffer, rgb.byteOffset + y * stride, stride).copy(raw, y * (stride + 1) + 1);
+    pixels.copy(raw, y * (stride + 1) + 1, y * stride, (y + 1) * stride);
   }
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
@@ -340,7 +370,13 @@ function encodePNG(width, height, rgb, channels = 3) {
   ihdr[10] = 0;
   ihdr[11] = 0;
   ihdr[12] = 0;
-  const idat = zlib.deflateSync(raw, { level: 9 });
+  // Sparse marks and grainy paper can compress better with no prediction.
+  // Keep that exact encoding when the adaptive stream does not save space.
+  let idat = zlib.deflateSync(raw, { level: 9 });
+  if (applyScanlineFilters(raw, pixels, stride, channels)) {
+    const filtered = zlib.deflateSync(raw, { level: 6 });
+    if (filtered.length < idat.length) idat = filtered;
+  }
   return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     chunk('IHDR', ihdr),

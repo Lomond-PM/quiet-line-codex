@@ -10,7 +10,7 @@ Quiet Line 是一个面向 Codex 的绘画插件，主要模拟真实画材的�
 
 Quiet Line is a local painting plugin for Codex focused on simulating traditional art materials: expressive ink, erasable graphite and charcoal, and wet oils with pigment pickup, blending, relief and drying.
 
-此仓库包含 Quiet Line 1.6.0 绘画引擎、Codex 本地 MCP 接入和绘画技能。工程存储、按需导出 PNG 和旧工程转换见[工程说明](plugins/quiet-line/engine/PROJECTS.md)。
+此仓库包含 Quiet Line 1.6.1 绘画引擎、Codex 本地 MCP 接入和绘画技能。工程存储、按需导出 PNG 和旧工程转换见[工程说明](plugins/quiet-line/engine/PROJECTS.md)。
 
 ## 安装
 
