@@ -88,7 +88,8 @@ export async function runTool(name, args, signal) {
         .toBuffer();
       content.push({ type: 'image', mimeType: 'image/jpeg', data: jpeg.toString('base64') });
     } catch {
-      content.push({ type: 'text', text: `Preview unavailable. The full PNG is saved at ${result.absolutePath}.` });
+      const text = result.absolutePath ? `Preview unavailable. The full PNG is saved at ${result.absolutePath}.` : 'Preview unavailable.';
+      content.push({ type: 'text', text });
     }
   }
 

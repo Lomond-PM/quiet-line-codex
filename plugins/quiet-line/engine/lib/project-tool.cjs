@@ -94,8 +94,10 @@ async function executeProject(args, exec, { ctx, execute, outputPath, writeDrawi
       stage = 'drawing';
       const { state, png, info, marks, subject, imported, dryMedia } = await MIXED.drawMixed(cwd, dir, args, previous?.selected, execute, exec);
       exec.signal?.throwIfAborted();
-      const requested = outputPath(cwd, args.output, info.title, info.seed);
-      const target = await writeDrawing(cwd, requested, png, { continuation: true, explicitOutput: !!args.output?.trim() });
+      const requested = outputPath(cwd, args.output === false ? undefined : args.output, info.title, info.seed);
+      const target = args.output === false ? undefined : await writeDrawing(cwd, requested, png, {
+        continuation: true, explicitOutput: !!args.output?.trim()
+      });
       stage = 'commit';
       exec.signal?.throwIfAborted();
       const committed = await store().commitProject(cwd, args.project, {
@@ -105,10 +107,10 @@ async function executeProject(args, exec, { ctx, execute, outputPath, writeDrawi
         maxBytes: args.project_max_mb === undefined ? previous?.maxBytes ?? 2048 * 1024 * 1024 : args.project_max_mb * 1024 * 1024
       });
       const limits = ctx.get('attachments')?.imageLimits;
-      const preview = limits ? await attachImage(ctx, png, path.basename(target), limits) : {};
+      const preview = limits ? await attachImage(ctx, png, path.basename(target ?? requested), limits) : {};
       return {
-        ...info, ...preview, subject, marks, bytes: png.length, absolutePath: target,
-        path: path.relative(cwd, target).split(path.sep).join('/'),
+        ...info, ...preview, subject, marks, bytes: png.length,
+        ...(target ? { absolutePath: target, path: path.relative(cwd, target).split(path.sep).join('/') } : {}),
         project: committed.path, projectStep: committed.head, projectRevision: committed.revision, projectMode: 'mixed',
         ...(dryMedia ? { dryMedia: true } : {}),
         ...(imported ? { baseImage: imported.path, resizedBase: imported.resized } : {})
@@ -117,6 +119,8 @@ async function executeProject(args, exec, { ctx, execute, outputPath, writeDrawi
   } catch (error) { throw stageError(stage, error); }
 }
 const stepSchema = { type: 'integer', minimum: 1, description: 'Saved step ID; defaults to current head when optional.' };
+const projectActions = ['list', 'restore', 'checkpoint', 'delete_checkpoint', 'prune', 'branch', 'compact', 'export', 'dry_paint', 'recover'];
+const targetActions = ['branch', 'compact', 'export'];
 const metadataProperties = {
   path: { type: 'string' }, mode: { type: 'string', enum: ['wet', 'dry', 'mixed'] }, head: { type: 'integer' }, revision: { type: 'integer' },
   historyLimit: { type: 'integer' }, maxBytes: { type: 'integer' },
@@ -136,31 +140,31 @@ function createProjectTool(ctx) {
     name: 'quiet_line_project',
     description: 'Manage a single Quiet Line .qlproject file: list metadata/history, restore a saved step (retaining later history), pin a checkpoint, delete_checkpoint, prune automatic history/change limits, branch to a NEW .qlproject, export a selected step to a NEW .png/.qlpaint/.qldry, explicitly dry the current wet oil paint without changing its visible PNG or relief, or recover a safely contained project after interrupted SQLite writes and run a full integrity check. Recovery preserves history/revision and refuses unsafe files or active locks. No image attachment is needed. Continue drawing with quiet_line_draw project; project state is never overwritten by an import.',
     parameters: { type: 'object', additionalProperties: false, required: ['project', 'action'], properties: {
-      project: parameters.project, action: { type: 'string', enum: ['list', 'restore', 'checkpoint', 'delete_checkpoint', 'prune', 'branch', 'export', 'dry_paint', 'recover'], description: 'dry_paint dries oil pigment in the current step, if present, while retaining its visible PNG and relief and the rest of the artwork. Normal history pruning applies; pin or branch first to preserve the previous wet step.' },
+      project: parameters.project, action: { type: 'string', enum: projectActions, description: 'dry_paint dries oil pigment in the current step, if present, while retaining its visible PNG and relief and the rest of the artwork. Normal history pruning applies; pin or branch first to preserve the previous wet step.' },
       step: stepSchema, label: { type: 'string', minLength: 1, maxLength: 120, description: 'Required checkpoint label.' },
       target: { type: 'string', description: 'Required NEW path for branch (.qlproject) or export (.png/.qlpaint/.qldry); inside working directory, existing parent, never overwrites.' },
       history_limit: { type: 'integer', minimum: 1, maximum: 500 }, max_mb: { type: 'integer', minimum: 64, maximum: 8192 }
     } },
     output: { schema: { type: 'object', additionalProperties: false, properties: { ...metadataProperties, target: { type: 'string' }, exportedMode: { type: 'string', enum: ['wet', 'dry', 'mixed'] } }, required: ['path', 'mode', 'head', 'revision', 'historyLimit', 'maxBytes', 'steps'] }, render: renderProject },
-    timeoutMs: 60000,
+    // Full-history copies can verify several GiB of stored paint in one call.
+    timeoutMs: 600000,
     isConcurrencySafe: () => false,
     async execute(args, exec) {
       let stage = 'validation';
       try {
         if (!exec.agent) throw new Error('quiet_line_project needs an owning Agent session');
         projectPath(args.project);
-        const actions = ['list', 'restore', 'checkpoint', 'delete_checkpoint', 'prune', 'branch', 'export', 'dry_paint', 'recover'];
-        if (!actions.includes(args.action)) throw new Error('unknown project action');
+        if (!projectActions.includes(args.action)) throw new Error('unknown project action');
         if (args.step !== undefined) integer(args.step, 1, Number.MAX_SAFE_INTEGER, 'step');
         if (args.label !== undefined) label(args.label);
         if (args.action === 'checkpoint' && args.label === undefined) throw new Error('checkpoint requires label');
         if (args.label !== undefined && args.action !== 'checkpoint') throw new Error('label is only for checkpoint');
-        if (args.target !== undefined && !['branch', 'export'].includes(args.action)) throw new Error('target is only for branch/export');
-        if (['branch', 'export'].includes(args.action) && args.target === undefined) throw new Error(`${args.action} requires target`);
+        if (args.target !== undefined && !targetActions.includes(args.action)) throw new Error('target is only for branch, compact or export');
+        if (targetActions.includes(args.action) && args.target === undefined) throw new Error(`${args.action} requires target`);
         if (args.action !== 'prune' && (args.history_limit !== undefined || args.max_mb !== undefined)) throw new Error('history_limit/max_mb are only for prune');
         if (args.history_limit !== undefined) integer(args.history_limit, 1, 500, 'history_limit');
         if (args.max_mb !== undefined) integer(args.max_mb, 64, 8192, 'max_mb');
-        if (args.step !== undefined && ['list', 'prune', 'recover', 'dry_paint'].includes(args.action)) throw new Error('step is not used by list/prune/recover/dry_paint');
+        if (args.step !== undefined && ['list', 'prune', 'recover', 'dry_paint', 'compact'].includes(args.action)) throw new Error(`step is not used by ${args.action}`);
         const cwd = await ctx.workingDirectory.ensure(exec.agent, exec.signal);
         if (!cwd) throw new Error('the session working directory is unavailable');
         if (args.action === 'recover') {

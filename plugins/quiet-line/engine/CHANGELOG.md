@@ -1,5 +1,10 @@
 # Changelog / 更新记录
 
+## 1.6.0 — 2026-11-27
+
+- 新工程可在步骤之间共享相同的材质数据。`compact` 将现存历史和检查点完整复制到新文件，`output: false` 在工程内保存画面并省略外部 PNG。
+- New projects share identical material data across steps. The `compact` action copies all retained history and checkpoints into a new project. Project draws accept `output: false` to keep their PNG inside the project.
+
 ## 1.5.2 — 2026-11-23
 
 - 笔触尺度与密度由视觉目标决定。工具和指南将阶段顺序、笔触手法和修改轮次表述为可选方法，并保留实际参数限制。

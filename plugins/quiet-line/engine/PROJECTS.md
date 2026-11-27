@@ -39,9 +39,19 @@ A single project can alternate between oil, palette knife, graphite, charcoal, i
 
 Defaults retain the **30 most recent unpinned automatic steps**, configurable from `1..500`, plus up to **64 named checkpoints**. The logical size limit defaults to **2048 MiB**, configurable from `64..8192 MiB`; this includes compressed material snapshots, PNG previews and records, with up to 16 MiB reserved separately for SQLite page overhead. Oldest unpinned steps are pruned first, never the current head or pinned checkpoints. If the remaining data still exceeds capacity, the commit fails without replacing the previous project. Unpin checkpoints or raise the limit. A history step is one successful tool call, not one individual stroke.
 
-**一个文件不意味着无限空间。** 当前保存的是完整、压缩后的材料快照，而不是每笔的极小增量；复杂或大画布工程仍可能很大。已有历史不需要在每次绘制时重新演算。
+### 工程存储 / Project storage
 
-**One file does not mean unlimited space.** History stores full compressed material snapshots, not tiny per-stroke deltas. Complex projects can still be large, but earlier strokes do not have to be replayed for each new drawing.
+Quiet Line 1.6.0 新建的画布使用 v4 工程。多个步骤可以引用同一份材质数据，每步仍可单独恢复或导出。容量上限继续按各步完整的逻辑大小计算。工程内总会保存该步的完整 PNG。在绘画调用里指定 `"output": false`，可以只写工程；指定 PNG 路径则同时导出图片。
+
+New canvases use format v4 in Quiet Line 1.6.0. Steps share byte-identical material data and can be restored or exported independently. The capacity limit still counts the full logical size of each step. Every step retains its PNG in the project. Set `output` to `false` on a project draw to skip the external PNG, or supply a path to export it.
+
+用 `quiet_line_project` 的 `compact` 操作把旧工程的全部现存历史复制到新文件。步骤编号、检查点、当前步骤和修订号一起保留。新文件需要 Quiet Line 1.6.0 或更新版本。原件可继续用原来的插件打开，两份同时保留会占用两份文件的空间。
+
+Use `compact` to copy all retained history into a new v4 file. It preserves step IDs, checkpoints, the current head and the revision. The copy requires Quiet Line 1.6.0 or later. The original stays usable with its existing plugin. Both files occupy disk space when retained together.
+
+```json
+{"project":"blank-study.qlproject","action":"compact","target":"blank-study-compact.qlproject"}
+```
 
 ## 开始湿画工程 / Start a wet project
 

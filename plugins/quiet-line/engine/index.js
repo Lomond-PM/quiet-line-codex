@@ -329,9 +329,9 @@ async function attachImage(ctx, png, name, limits) {
 
 function renderValue(value) {
   const lines = [
-    `Drew “${value.title}” ${value.baseImage ? 'over an existing image' : `on ${SURFACE_LABELS[value.surface] || value.surface}`} with a ${BRUSH_LABELS[value.brush] || value.brush} at ${value.width}×${value.height}, seed ${value.seed}, ${value.marks} new marks.`,
-    `File: ${value.path}`
+    `Drew “${value.title}” ${value.baseImage ? 'over an existing image' : `on ${SURFACE_LABELS[value.surface] || value.surface}`} with a ${BRUSH_LABELS[value.brush] || value.brush} at ${value.width}×${value.height}, seed ${value.seed}, ${value.marks} new marks.`
   ];
+  if (value.path) lines.push(`File: ${value.path}`);
   if (value.project) {
     lines.push(`Project: ${value.project} — ${value.projectMode} step ${value.projectStep}, revision ${value.projectRevision}. Editable material state and this PNG are auto-saved in the single project file.`);
     lines.push('Continue with project set to this same file. Use quiet_line_project to list history, restore, checkpoint, branch or export; no loose state snapshots are needed. Choose a brush or dry-media operations for the next pass. Changing brushes keeps existing material states editable.');
@@ -447,7 +447,7 @@ export function apply(ctx) {
           description: 'Optional warm accent as #rrggbb. By default the surface supplies its own ink and accent palette.'
         },
         output: {
-          type: 'string',
+          oneOf: [{ type: 'string' }, { const: false }],
           description: 'Optional PNG path inside the session working directory. Default quiet-line-out/<title>-<seed>.png. With base_image, an explicit path must be NEW; default filenames gain a numeric suffix if occupied. Neither the source nor any existing file is overwritten during continuation.'
         },
         strokes: {
@@ -498,7 +498,8 @@ export function apply(ctx) {
           image: IMAGE_SCHEMA,
           note: { type: 'string' }
         },
-        required: ['title', 'subject', 'brush', 'surface', 'seed', 'path', 'absolutePath', 'width', 'height', 'bytes', 'marks']
+        required: ['title', 'subject', 'brush', 'surface', 'seed', 'width', 'height', 'bytes', 'marks'],
+        anyOf: [{ required: ['path', 'absolutePath'] }, { required: ['project', 'projectStep', 'projectRevision'] }]
       },
       render(_args, value) {
         const blocks = [{ type: 'text', text: renderValue(value) }];
@@ -510,6 +511,8 @@ export function apply(ctx) {
     isConcurrencySafe: () => false,
     async execute(args, exec, options = {}) {
       if (!exec.agent) fail('quiet_line_draw needs an owning Agent session');
+      if (args.output === false && args.project == null) fail('output: false requires project');
+      if (args.output != null && args.output !== false && typeof args.output !== 'string') fail('output must be a PNG path or false');
       if (args.project != null) return PROJECT_TOOL.executeProject(args, exec, {
         ctx, execute: (raw, run, opts) => drawingTool.execute(raw, run, opts),
         outputPath, writeDrawing, attachImage

@@ -8,8 +8,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
+const components = require('./project-components.cjs');
 const MiB = 1024 * 1024;
 const APP_ID = 0x514c5052;
+const COMPACT_VERSION = 4;
 const MIXED_VERSION = 3;
 const PER_STEP_VERSION = 2;
 const LEGACY_VERSION = 1;
@@ -30,7 +32,7 @@ const STEP_SCHEMAS = Object.fromEntries(['wet', 'dry'].map(mode => [mode,
   SCHEMA.steps.slice(0, -1) + `, mode TEXT NOT NULL DEFAULT '${mode}')`
 ]));
 function supportedVersion(version) {
-  return version === LEGACY_VERSION || version === PER_STEP_VERSION || version === MIXED_VERSION;
+  return [LEGACY_VERSION, PER_STEP_VERSION, MIXED_VERSION, COMPACT_VERSION].includes(version);
 }
 function stateByteLimit(mode) { return mode === 'mixed' ? MAX_MIXED_STATE : MAX_STATE; }
 function fail(message, code = 'ERR_PROJECT_INVALID') {
@@ -151,12 +153,14 @@ function validate(db, file, changed = false) {
   if (scalar(db, 'application_id') !== APP_ID || !supportedVersion(version)) fail('wrong application id or version');
   if (scalar(db, 'journal_mode') !== 'delete' || scalar(db, 'auto_vacuum') !== 1) fail('unsupported journal/auto_vacuum configuration');
   const schemaBounds = db.prepare('SELECT count(*) AS n,max(length(CAST(sql AS BLOB))) AS longest FROM sqlite_schema').get();
-  if (schemaBounds.n !== 2 || schemaBounds.longest > 1024) fail('unsupported/oversized schema');
+  const compact = version === COMPACT_VERSION;
+  if (schemaBounds.n !== (compact ? 4 : 2) || schemaBounds.longest > 1024) fail('unsupported/oversized schema');
   const perStep = version >= PER_STEP_VERSION;
-  const allowedModes = version === MIXED_VERSION ? "'wet','dry','mixed'" : "'wet','dry'";
+  const allowedModes = version >= MIXED_VERSION ? "'wet','dry','mixed'" : "'wet','dry'";
   const schema = db.prepare('SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY name').all();
-  if (schema.length !== 2 || schema.some(r => r.type !== 'table' || r.tbl_name !== r.name ||
-    (perStep && r.name === 'steps' ? !Object.values(STEP_SCHEMAS).includes(r.sql) : SCHEMA[r.name] !== r.sql))) fail('unsupported schema (tables, indexes, views, triggers must match)');
+  const tables = compact ? { ...SCHEMA, ...components.schema } : SCHEMA;
+  if (schema.some(r => r.type !== 'table' || r.tbl_name !== r.name || !Object.hasOwn(tables, r.name) ||
+    (perStep && r.name === 'steps' ? !Object.values(STEP_SCHEMAS).includes(r.sql) : tables[r.name] !== r.sql))) fail('unsupported schema (tables, indexes, views, triggers must match)');
   const unsafeMeta = db.prepare(`SELECT count(*) AS n FROM project WHERE typeof(mode)!='text' OR length(CAST(mode AS BLOB))>5 OR mode NOT IN (${allowedModes}) OR typeof(singleton)!='integer' OR typeof(head)!='integer' OR typeof(revision)!='integer' OR typeof(historyLimit)!='integer' OR typeof(maxBytes)!='integer' OR typeof(nextId)!='integer'`).get().n;
   if (unsafeMeta) fail('invalid project metadata types/lengths');
   const rows = db.prepare('SELECT * FROM project LIMIT 2').all();
@@ -179,7 +183,9 @@ function validate(db, file, changed = false) {
   // Check mode types and lengths in SQL before selecting any untrusted value.
   if (perStep && db.prepare(`SELECT count(*) AS n FROM steps WHERE typeof(mode)!='text' OR length(CAST(mode AS BLOB))>5 OR mode NOT IN (${allowedModes})`).get().n) fail('invalid step mode');
   const lengths = db.prepare(`SELECT id, typeof(state) AS st, length(state) AS sl, typeof(png) AS pt, length(png) AS pl, typeof(info) AS it, length(CAST(info AS BLOB)) AS il, length(CAST(label AS BLOB)) AS ll, length(CAST(createdAt AS BLOB)) AS cl${perStep ? ',mode' : ''} FROM steps ORDER BY id`).all();
+  const componentIndex = compact ? components.index(db, lengths, MAX_MIXED_STATE) : undefined;
   for (const r of lengths) {
+    if (compact) r.sl = componentIndex.get(r.id).size;
     if (r.st !== 'blob' || !Number.isSafeInteger(r.sl) || r.sl < 1 || r.sl > stateByteLimit(r.mode ?? m.mode) || r.pt !== 'blob' || !Number.isSafeInteger(r.pl) || r.pl < 8 || r.pl > MAX_PNG || r.it !== 'text' || r.il < 2 || r.il > MAX_INFO || (r.ll !== null && r.ll > 480) || r.cl !== 24) fail('invalid/oversized stored BLOB or metadata length');
   }
   const steps = db.prepare(`SELECT id,parentId,createdAt,label,bytes,pinned,info${perStep ? ',mode' : ''} FROM steps ORDER BY id`).all();
@@ -203,7 +209,7 @@ function validate(db, file, changed = false) {
   }
   const head = steps.find(r => r.id === m.head);
   if (!head || head.mode !== m.mode || pins > 64 || automatic > m.historyLimit || total > m.maxBytes) fail('invalid history/capacity or head mode');
-  return { ...m, version, steps: steps.map(({ info, ...r }) => ({ ...r, pinned: Boolean(r.pinned) })) };
+  return { ...m, version, componentIndex, steps: steps.map(({ info, ...r }) => ({ ...r, pinned: Boolean(r.pinned) })) };
 }
 function metadata(file, m) {
   return { path: file, mode: m.mode, head: m.head, revision: m.revision, historyLimit: m.historyLimit, maxBytes: m.maxBytes, steps: m.steps };
@@ -216,7 +222,8 @@ function selected(db, m, id) {
   if (!png.subarray(0, 8).equals(PNG_MAGIC)) fail('invalid stored PNG signature');
   // SQLite returns owned byte arrays. Wrap them without copying potentially
   // hundreds of MiB into a second allocation.
-  const state = Buffer.from(row.state.buffer, row.state.byteOffset, row.state.byteLength);
+  const state = m.componentIndex ? components.read(db, m.componentIndex.get(id)) :
+    Buffer.from(row.state.buffer, row.state.byteOffset, row.state.byteLength);
   return { id: row.id, mode: m.steps.find(s => s.id === id).mode, state, png, info: JSON.parse(row.info) };
 }
 function readProject(cwd, requested, { step, includeData = false } = {}) {
@@ -239,18 +246,21 @@ function prune(db, head, limits) {
   if (pins > 64) fail('at most 64 pinned checkpoints', 'ERR_PROJECT_CAPACITY');
   let automatic = rows.length - pins, bytes = rows.reduce((n, s) => n + s.bytes, 0);
   const remove = db.prepare('DELETE FROM steps WHERE id=?');
+  let removed = false;
   for (const row of rows) {
     if (automatic <= limits.historyLimit && bytes <= limits.maxBytes) break;
     if (row.pinned || row.id === head) continue;
-    remove.run(row.id); automatic--; bytes -= row.bytes;
+    remove.run(row.id); removed = true; automatic--; bytes -= row.bytes;
   }
   if (automatic > limits.historyLimit || bytes > limits.maxBytes) fail('capacity cannot fit head and pinned checkpoints; unpin checkpoints or increase maxBytes', 'ERR_PROJECT_CAPACITY');
+  if (removed && scalar(db, 'user_version') === COMPACT_VERSION) components.collect(db);
 }
-function addStep(db, id, parentId, p) {
+function addStep(db, id, parentId, p, createdAt = new Date().toISOString()) {
   const bytes = p.state.length + p.png.length + Buffer.byteLength(p.info) + (p.label ? Buffer.byteLength(p.label) : 0) + 128;
-  const perStep = scalar(db, 'user_version') >= PER_STEP_VERSION;
+  const version = scalar(db, 'user_version'), perStep = version >= PER_STEP_VERSION;
+  const state = version === COMPACT_VERSION ? components.put(db, id, p.mode, p.state) : p.state;
   db.prepare(`INSERT INTO steps (id,parentId,createdAt,label,bytes,pinned,state,png,info${perStep ? ',mode' : ''}) VALUES (?,?,?,?,?,?,?,?,?${perStep ? ',?' : ''})`)
-    .run(id, parentId, new Date().toISOString(), p.label, bytes, p.label ? 1 : 0, p.state, p.png, p.info, ...(perStep ? [p.mode] : []));
+    .run(id, parentId, createdAt, p.label, bytes, p.label ? 1 : 0, state, p.png, p.info, ...(perStep ? [p.mode] : []));
 }
 function physical(db, maxBytes) {
   if ((scalar(db, 'page_count') - scalar(db, 'freelist_count')) * scalar(db, 'page_size') > maxBytes + OVERHEAD) fail('SQLite physical overhead exceeds 16 MiB allowance', 'ERR_PROJECT_CAPACITY');
@@ -269,7 +279,7 @@ function mutate(file, expectedRevision, fn) {
   } catch (error) { if (db) rollback(db); throw error; }
   finally { if (db) db.close(); }
 }
-function create(cwd, requested, p, limits) {
+function createDatabase(cwd, requested, version, populate) {
   const file = resolvePath(cwd, requested, true);
   if (fs.existsSync(file)) fail('project already exists; expectedRevision:null is creation-only', 'EEXIST');
   const temporary = path.join(path.dirname(file), `.qlproject-${crypto.randomUUID()}.qlproject`);
@@ -277,13 +287,13 @@ function create(cwd, requested, p, limits) {
   try {
     const fd = fs.openSync(temporary, 'wx', 0o600); ownsTemporary = true; fs.closeSync(fd);
     db = new DatabaseSync(temporary, { enableDoubleQuotedStringLiterals: false, allowExtension: false });
-    const version = p.mode === 'mixed' ? MIXED_VERSION : PER_STEP_VERSION;
     db.exec(`PRAGMA trusted_schema=OFF; PRAGMA journal_mode=DELETE; PRAGMA auto_vacuum=FULL; PRAGMA application_id=${APP_ID}; PRAGMA user_version=${version};`);
     db.exec(`${SCHEMA.project}; ${STEP_SCHEMAS.wet}; BEGIN IMMEDIATE;`);
-    addStep(db, 1, null, p);
-    db.prepare('INSERT INTO project VALUES (1,?,?,?,?,?,?)').run(p.mode, 1, 1, limits.historyLimit, limits.maxBytes, 2);
-    prune(db, 1, limits); physical(db, limits.maxBytes);
-    const result = metadata(file, validate(db, temporary));
+    if (version === COMPACT_VERSION) db.exec(Object.values(components.schema).join(';'));
+    const verify = populate(db);
+    const m = validate(db, temporary);
+    if (verify) verify(db, m);
+    const result = metadata(file, m);
     db.exec('COMMIT;'); db.close(); db = undefined;
     const syncFd = fs.openSync(temporary, 'r+'); try { fs.fsyncSync(syncFd); } finally { fs.closeSync(syncFd); }
     // Recheck the path after work, and publish without replacing any existing
@@ -298,6 +308,46 @@ function create(cwd, requested, p, limits) {
       try { fs.unlinkSync(temporary + suffix); } catch (e) { if (e.code !== 'ENOENT') throw e; }
     }
   }
+}
+function create(cwd, requested, p, limits, version = p.mode === 'mixed' ? COMPACT_VERSION : PER_STEP_VERSION) {
+  return createDatabase(cwd, requested, version, db => {
+    addStep(db, 1, null, p);
+    db.prepare('INSERT INTO project VALUES (1,?,?,?,?,?,?)').run(p.mode, 1, 1, limits.historyLimit, limits.maxBytes, 2);
+    prune(db, 1, limits); physical(db, limits.maxBytes);
+  });
+}
+function compactCopy(cwd, requested, target, expectedRevision) {
+  const sourceFile = resolvePath(cwd, requested, false);
+  let source;
+  try {
+    source = open(sourceFile, false);
+    source.exec('BEGIN;');
+    const original = validate(source, sourceFile);
+    cas(original, expectedRevision);
+    return createDatabase(cwd, target, COMPACT_VERSION, db => {
+      // Copy one step at a time, including raw info JSON and timestamps. Keep
+      // only digests and bounded metadata for verification before publication.
+      const expected = new Map();
+      const rawInfo = source.prepare('SELECT info FROM steps WHERE id=?');
+      for (const step of original.steps) {
+        const p = selected(source, original, step.id);
+        const info = rawInfo.get(step.id).info;
+        addStep(db, step.id, step.parentId, { ...p, info, label: step.label }, step.createdAt);
+        expected.set(step.id, { state: components.digest(p.state), png: components.digest(p.png), info });
+      }
+      const { mode, head, revision, historyLimit, maxBytes, nextId } = original;
+      db.prepare('INSERT INTO project VALUES (1,?,?,?,?,?,?)').run(mode, head, revision, historyLimit, maxBytes, nextId);
+      physical(db, maxBytes);
+      return (destination, copy) => {
+        if (copy.nextId !== nextId || JSON.stringify(metadata('', copy)) !== JSON.stringify(metadata('', original))) fail('compact copy history verification failed');
+        const copiedInfo = destination.prepare('SELECT info FROM steps WHERE id=?');
+        for (const [id, before] of expected) {
+          const after = selected(destination, copy, id);
+          if (!components.digest(after.state).equals(before.state) || !components.digest(after.png).equals(before.png) || copiedInfo.get(id).info !== before.info) fail('compact copy payload verification failed');
+        }
+      };
+    });
+  } finally { if (source) source.close(); }
 }
 function commitProject(cwd, requested, options) {
   const p = payload(options);
@@ -326,6 +376,7 @@ function commitProject(cwd, requested, options) {
 }
 function manageProject(cwd, requested, options) {
   const { action, step, label, target, expectedRevision } = options;
+  if (action === 'compact') return compactCopy(cwd, requested, target, expectedRevision);
   if (action === 'recover') {
     // Explicitly authorized SQLite hot-journal rollback, not a history mutation.
     // The rollback happens on opening/reading, necessarily before any optional
@@ -354,7 +405,7 @@ function manageProject(cwd, requested, options) {
       const m = validate(db, file); cas(m, expectedRevision);
       const s = selected(db, m, step);
       const p = payload({ mode: s.mode, state: s.state, png: s.png, info: s.info, label });
-      const result = create(cwd, target, p, settings(options.historyLimit, options.maxBytes, m));
+      const result = create(cwd, target, p, settings(options.historyLimit, options.maxBytes, m), COMPACT_VERSION);
       db.exec('COMMIT;'); return result;
     } finally { if (db) db.close(); }
   }

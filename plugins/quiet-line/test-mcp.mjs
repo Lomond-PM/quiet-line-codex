@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -76,4 +76,16 @@ test('Quiet Line over MCP', async t => {
   assert.deepEqual(await readFile(wet.absolutePath), original);
   assert.equal((await draw({ subject: 'cup', size: 320, output: '../escape.png' })).isError, true);
   assert.equal((await draw({ subject: 'cup', size: '320' })).isError, true);
+
+  const before = await readdir(workspace);
+  const embedded = await draw({ project: 'embedded.qlproject', size: 320, strokes: [stroke], output: false });
+  assert.equal(success(embedded).path, undefined);
+  assert.equal(embedded.structuredContent.absolutePath, undefined);
+  assert.equal(embedded.content.find(block => block.type === 'image')?.mimeType, 'image/jpeg');
+  assert.deepEqual((await readdir(workspace)).sort(), [...before, 'embedded.qlproject'].sort());
+  const continued = await draw({ project: 'embedded.qlproject', output: false, preview: false });
+  assert.equal(success(continued).projectStep, 2);
+  assert.ok(continued.content.every(block => block.type === 'text'));
+  assert.equal((await draw({ size: 320, output: false })).isError, true);
+  assert.equal((await draw({ project: 'embedded.qlproject', output: true })).isError, true);
 });

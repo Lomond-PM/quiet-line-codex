@@ -97,8 +97,8 @@ try {
   });
   test('V1 and V2 upgrade to V3 without changing old state; mixed history branches and restores', () => {
     const mixed = Buffer.from('opaque mixed material state');
-    const fresh = commit('fresh-v3.qlproject', { mode: 'mixed', state: mixed });
-    assert.equal(version('fresh-v3.qlproject'), 3);
+    const fresh = commit('fresh-mixed.qlproject', { mode: 'mixed', state: mixed });
+    assert.equal(version('fresh-mixed.qlproject'), 4);
     assert.deepEqual(readProject(cwd, fresh.path, { includeData: true }).selected.state, mixed);
 
     for (const oldVersion of [1, 2]) {
@@ -122,7 +122,7 @@ try {
       const sourceBeforeBranch = fs.readFileSync(m.path);
       const target = `mixed-branch-v${oldVersion}.qlproject`;
       const branch = manageProject(cwd, file, { action: 'branch', step: 2, target, expectedRevision: m.revision });
-      assert.equal(version(target), 3);
+      assert.equal(version(target), 4);
       assert.equal(branch.mode, 'mixed');
       assert.deepEqual(readProject(cwd, target, { includeData: true }).selected.state, mixed);
       assert.deepEqual(fs.readFileSync(m.path), sourceBeforeBranch);
